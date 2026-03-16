@@ -838,6 +838,38 @@ body::before{content:'';position:fixed;inset:0;background:repeating-linear-gradi
               onchange="handleEstFile(this.files[0])"/>
             <img id="est-preview" class="est-preview" style="display:none;margin-top:12px;max-height:160px;border-radius:8px"/>
           </div>
+          <!-- Per-estimate overrides -->
+          <div style="margin-top:12px;padding:12px 14px;background:var(--surface2);border-radius:8px;border:1px solid var(--border2)">
+            <div style="font-size:0.72rem;font-weight:600;color:var(--blue);letter-spacing:0.5px;text-transform:uppercase;margin-bottom:10px">
+              ⚙️ Override for this estimate only
+              <span style="font-size:0.68rem;color:var(--text-dim);font-weight:400;text-transform:none;letter-spacing:0"> — leave blank to use defaults from pricing database</span>
+            </div>
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+              <div>
+                <label style="font-size:0.75rem;color:var(--text-dim);display:block;margin-bottom:4px">
+                  Margin % override
+                  <span id="est-margin-hint" style="color:var(--text-dim);font-size:0.68rem"></span>
+                </label>
+                <input class="modal-input" type="number" id="est-override-margin"
+                  placeholder="e.g. 35"
+                  min="0" max="100"
+                  style="text-align:center"
+                  oninput="updateEstOverrideHints()"/>
+              </div>
+              <div>
+                <label style="font-size:0.75rem;color:var(--text-dim);display:block;margin-bottom:4px">
+                  Labour rate AUD/hr override
+                  <span id="est-labour-hint" style="color:var(--text-dim);font-size:0.68rem"></span>
+                </label>
+                <input class="modal-input" type="number" id="est-override-labour"
+                  placeholder="e.g. 95"
+                  min="0"
+                  style="text-align:center"
+                  oninput="updateEstOverrideHints()"/>
+              </div>
+            </div>
+          </div>
+
           <div style="margin-top:10px;display:flex;gap:10px;flex-wrap:wrap;align-items:center">
             <div style="flex:1;min-width:200px">
               <label style="font-size:0.78rem;color:var(--text-dim);display:block;margin-bottom:4px">Extra notes for AI (optional)</label>
@@ -3199,7 +3231,9 @@ async function runEstimator(){
   const client  = document.getElementById('est-client')?.value.trim();
   const address = document.getElementById('est-address')?.value.trim();
   const type    = document.getElementById('est-type')?.value;
-  const notes   = document.getElementById('est-notes-input')?.value.trim();
+  const notes          = document.getElementById('est-notes-input')?.value.trim();
+  const overrideMargin = parseFloat(document.getElementById('est-override-margin')?.value) || 0;
+  const overrideLabour = parseFloat(document.getElementById('est-override-labour')?.value) || 0;
 
   if(!client){ toast('⚠️ Please enter client name'); return; }
   if(!estFileData){ toast('⚠️ Please upload a PDF or image first'); return; }
@@ -3230,8 +3264,8 @@ ${notes ? 'Additional Notes: ' + notes : ''}
 
 ${pricingContext}
 
-Default labour rate: AUD $${PRICING_DB.labourRate}/hr
-Default margin: ${PRICING_DB.margin}%
+Default labour rate: AUD $${overrideLabour || PRICING_DB.labourRate}/hr
+Default margin: ${overrideMargin || PRICING_DB.margin}%
 
 Based on the uploaded file, provide a detailed estimate in this EXACT JSON format (no markdown, no extra text):
 {
@@ -3244,7 +3278,7 @@ Based on the uploaded file, provide a detailed estimate in this EXACT JSON forma
   ],
   "subtotalMaterials": 0,
   "subtotalLabour": 0,
-  "marginRate": ${PRICING_DB.margin},
+  "marginRate": ${overrideMargin || PRICING_DB.margin},
   "marginAmount": 0,
   "grandTotal": 0
 }
@@ -3286,38 +3320,91 @@ Rules:
     const openAIKey = await getOpenAIKey();
     if(!openAIKey) throw new Error('Could not decrypt OpenAI key.');
 
-    // Build OpenAI messages with file
-    const msgContent = [];
-    if(estFileType === 'image'){
-      const mimeType = (['image/jpeg','image/png','image/gif','image/webp'].includes(window._estMimeType||'')) ? window._estMimeType : 'image/jpeg';
-      msgContent.push({ type:'image_url', image_url:{ url: 'data:' + mimeType + ';base64,' + estFileData } });
-    } else {
-      // PDF — send as file attachment via base64
-      msgContent.push({ type:'text', text:'[PDF attached as base64 — analyse the following document data for cabinet/joinery scope:]' });
-      msgContent.push({ type:'text', text: estFileData.slice(0, 8000) }); // first 8k chars of base64
-    }
-    msgContent.push({ type:'text', text: prompt });
-
-    const openAIBody = {
-      model: 'gpt-4o',
-      max_tokens: 4000,
-      messages: [{ role:'user', content: msgContent }]
-    };
-
+    // Build OpenAI request with file support
     let resp;
     try{
-      resp = await fetch('https://api.openai.com/v1/chat/completions', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': 'Bearer ' + openAIKey
-        },
-        body: JSON.stringify(openAIBody)
-      });
+      if(estFileType === 'pdf'){
+        // Upload PDF to OpenAI Files API first, then reference it
+        setEstStatus('Uploading PDF to OpenAI…');
+
+        // Convert base64 to blob
+        const byteChars = atob(estFileData);
+        const byteArr = new Uint8Array(byteChars.length);
+        for(let i=0;i<byteChars.length;i++) byteArr[i]=byteChars.charCodeAt(i);
+        const pdfBlob = new Blob([byteArr], {type:'application/pdf'});
+
+        // Upload via Files API
+        const formData = new FormData();
+        formData.append('file', pdfBlob, 'document.pdf');
+        formData.append('purpose', 'assistants');
+
+        const uploadResp = await fetch('https://api.openai.com/v1/files', {
+          method: 'POST',
+          headers: { 'Authorization': 'Bearer ' + openAIKey },
+          body: formData
+        });
+        if(!uploadResp.ok){
+          const e = await uploadResp.text();
+          throw new Error('PDF upload failed: ' + e.slice(0,200));
+        }
+        const uploadData = await uploadResp.json();
+        const fileId = uploadData.id;
+
+        setEstStatus('Analysing PDF with AI…');
+
+        // Use the Responses API with file search
+        const openAIBody = {
+          model: 'gpt-4o',
+          max_tokens: 4000,
+          messages: [{
+            role: 'user',
+            content: [
+              { type: 'text', text: prompt },
+              { type: 'file', file: { file_id: fileId } }
+            ]
+          }]
+        };
+        resp = await fetch('https://api.openai.com/v1/chat/completions', {
+          method: 'POST',
+          headers: { 'Content-Type':'application/json', 'Authorization':'Bearer ' + openAIKey },
+          body: JSON.stringify(openAIBody)
+        });
+
+        // Clean up uploaded file
+        fetch('https://api.openai.com/v1/files/' + fileId, {
+          method: 'DELETE',
+          headers: { 'Authorization': 'Bearer ' + openAIKey }
+        }).catch(()=>{});
+
+      } else {
+        // Image — send inline as base64
+        setEstStatus('Analysing image with AI…');
+        const mimeType = (['image/jpeg','image/png','image/gif','image/webp'].includes(window._estMimeType||'')) ? window._estMimeType : 'image/jpeg';
+        const openAIBody = {
+          model: 'gpt-4o',
+          max_tokens: 4000,
+          messages: [{
+            role: 'user',
+            content: [
+              { type: 'image_url', image_url: { url: 'data:' + mimeType + ';base64,' + estFileData, detail: 'high' } },
+              { type: 'text', text: prompt }
+            ]
+          }]
+        };
+        resp = await fetch('https://api.openai.com/v1/chat/completions', {
+          method: 'POST',
+          headers: { 'Content-Type':'application/json', 'Authorization':'Bearer ' + openAIKey },
+          body: JSON.stringify(openAIBody)
+        });
+      }
     }catch(e){
       throw new Error('Network error: ' + e.message);
     }
 
+    if(!resp.ok){
+      const errBody = await resp.text();
+      throw new Error('OpenAI error ' + resp.status + ': ' + errBody.slice(0,300));
+    }
     if(!resp.ok){
       const errBody = await resp.text();
       throw new Error('OpenAI error ' + resp.status + ': ' + errBody.slice(0,300));
@@ -3394,6 +3481,23 @@ function renderEstimate(est){
   document.getElementById('est-total').textContent = 'AUD $' + parseFloat(est.grandTotal||0).toLocaleString('en-AU', {minimumFractionDigits:2, maximumFractionDigits:2});
 }
 
+function updateEstOverrideHints(){
+  const marginEl  = document.getElementById('est-override-margin');
+  const labourEl  = document.getElementById('est-override-labour');
+  const mHint     = document.getElementById('est-margin-hint');
+  const lHint     = document.getElementById('est-labour-hint');
+  if(mHint){
+    const def = PRICING_DB.margin || 30;
+    mHint.textContent = marginEl?.value ? '(default: ' + def + '%)' : '(default: ' + def + '%)';
+    mHint.style.color = marginEl?.value ? 'var(--gold)' : 'var(--text-dim)';
+  }
+  if(lHint){
+    const def = PRICING_DB.labourRate || 85;
+    lHint.textContent = labourEl?.value ? '(default: $' + def + '/hr)' : '(default: $' + def + '/hr)';
+    lHint.style.color = labourEl?.value ? 'var(--gold)' : 'var(--text-dim)';
+  }
+}
+
 function clearEstimate(){
   currentEstimate = null; estFileData = null; estFileType = null;
   document.getElementById('est-result').style.display = 'none';
@@ -3402,6 +3506,9 @@ function clearEstimate(){
   document.getElementById('est-client').value = '';
   document.getElementById('est-address').value = '';
   document.getElementById('est-notes-input').value = '';
+  document.getElementById('est-override-margin').value = '';
+  document.getElementById('est-override-labour').value = '';
+  updateEstOverrideHints();
   document.getElementById('est-date').value = '';
   document.getElementById('est-preview').style.display = 'none';
   const txt = document.getElementById('est-upload-text');
