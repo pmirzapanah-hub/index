@@ -1,0 +1,30 @@
+{
+  "tasks": [
+    {"id": 1, "name": "Review Q1 budget report", "done": true, "pri": "h", "due": "2026-03-09"},
+    {"id": 2, "name": "Send stakeholder update", "done": false, "pri": "h", "due": "2026-03-09"},
+    {"id": 3, "name": "Update project timeline", "done": false, "pri": "m", "due": "2026-03-10"},
+    {"id": 4, "name": "Schedule team stand-up", "done": true, "pri": "l", "due": "2026-03-09"},
+    {"id": 5, "name": "Prepare compliance checklist", "done": false, "pri": "m", "due": "2026-03-11"},
+    {"id": 6, "name": "Archive sprint files", "done": false, "pri": "l", "due": "2026-03-12"}
+  ],
+  "projects": [
+    {"id": 1, "name": "PAH Web v1.1", "desc": "Admin panel upgrade", "progress": 78, "status": "on-track", "due": "2026-03-20"},
+    {"id": 2, "name": "Client Portal", "desc": "External client access", "progress": 45, "status": "at-risk", "due": "2026-03-15"},
+    {"id": 3, "name": "Data Migration", "desc": "Legacy system transfer", "progress": 60, "status": "in-progress", "due": "2026-04-01"},
+    {"id": 4, "name": "Compliance Audit", "desc": "Annual review prep", "progress": 30, "status": "overdue", "due": "2026-03-05"}
+  ],
+  "team": [
+    {"id": 1, "name": "Payam Mirzapanah", "role": "Project Manager", "status": "online", "color": "#1565c0"},
+    {"id": 2, "name": "Shahram ES`haghi", "role": "Manager", "status": "online", "color": "#2e7d32"},
+    {"id": 3, "name": "Clara Lee", "role": "Designer", "status": "away", "color": "#e65100"}
+  ],
+  "taskStatuses": [
+    {"id": "pending", "label": "Pending", "color": "var(--gold)", "done": false},
+    {"id": "in-progress", "label": "In Progress", "color": "var(--blue)", "done": false},
+    {"id": "done", "label": "Done", "color": "var(--green)", "done": true},
+    {"id": "blocked", "label": "Blocked", "color": "var(--red)", "done": false}
+  ],
+  "users": [
+    {"username": "VIP-Cabinets", "passwordHash": "e19bd725e77c0e7bf56670376ddb2d90c32886a6d43bcb016387a9885c638e53", "role": "admin", "builtIn": true}
+  ]
+}

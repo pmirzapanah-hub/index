@@ -1,0 +1,3445 @@
+<!DOCTYPE html>
+<html lang="en" dir="ltr">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1.0,maximum-scale=1.0,minimum-scale=1.0,user-scalable=no,viewport-fit=cover"/>
+<title>PAH – Admin Panel</title>
+<meta name="mobile-web-app-capable" content="yes"/>
+<meta name="apple-mobile-web-app-capable" content="yes"/>
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent"/>
+<meta name="apple-mobile-web-app-title" content="PAH Admin"/>
+<meta name="theme-color" content="#070d1a"/>
+<link rel="manifest" href="manifest.json"/>
+<link rel="apple-touch-icon" href="pah-icon-192.png"/>
+<link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@500;700;900&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet"/>
+<script src="https://alcdn.msauth.net/browser/2.38.0/js/msal-browser.min.js"></script>
+
+<script src="https://cdn.jsdelivr.net/npm/@emailjs/browser@4/dist/email.min.js"></script>
+<style>
+:root{
+  --bg:#070d1a;--surface:#0c1526;--surface2:#111e35;
+  --border:rgba(56,139,253,0.18);--border2:rgba(56,139,253,0.08);
+  --blue:#388bfd;--blue-dim:rgba(56,139,253,0.12);
+  --gold:#f0c060;--green:#3fb950;--red:#f85149;
+  --silver:#8b949e;--text:#cdd9e5;--text-dim:#768390;
+  --glow:0 0 20px rgba(56,139,253,0.2);--glow-s:0 0 32px rgba(56,139,253,0.4);
+}
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+
+html, body {
+  height: 100%;
+  overflow: hidden;
+}
+body {
+  font-family: 'DM Sans', sans-serif;
+  background: var(--bg);
+  color: var(--text);
+  display: flex;
+  flex-direction: column;
+}
+#login-screen {
+  position: fixed;
+  inset: 0;
+  z-index: 2000;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+}
+#login-screen.hidden { display: none; }
+#main-wrap {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+#app-shell {
+  flex: 1;
+  min-height: 0;
+  display: none;
+  flex-direction: column;
+  overflow: hidden;
+}
+#app-shell.visible {
+  display: flex;
+}
+#bottom-nav-outer {
+  display: none;
+  flex-shrink: 0;
+  background: var(--surface);
+  border-top: 1px solid var(--border);
+  padding: 6px 0 env(safe-area-inset-bottom, 6px);
+  -webkit-transform: translateZ(0);
+  transform: translateZ(0);
+}
+body::before{content:'';position:fixed;inset:0;background:repeating-linear-gradient(0deg,transparent,transparent 2px,rgba(0,0,0,0.03) 2px,rgba(0,0,0,0.03) 4px);pointer-events:none;z-index:9999}
+
+.topbar{display:flex;align-items:center;justify-content:space-between;padding:0 24px;height:60px;flex-shrink:0;background:linear-gradient(90deg,#060c1a,#0a1428 50%,#060c1a);border-bottom:1px solid var(--border);position:relative;z-index:10}
+.topbar::after{content:'';position:absolute;bottom:0;left:0;right:0;height:1px;background:linear-gradient(90deg,transparent,var(--blue),transparent)}
+
+/* Safe-area support for notch/status-bar on mobile */
+.topbar{padding-top:env(safe-area-inset-top,0);}
+#main-wrap{padding-top:env(safe-area-inset-top,0);}
+.brand{display:flex;align-items:center;gap:12px}
+.brand img{width:40px;height:40px;object-fit:contain;filter:drop-shadow(0 0 10px rgba(56,139,253,0.6));animation:logoPulse 3s ease-in-out infinite}
+@keyframes logoPulse{0%,100%{filter:drop-shadow(0 0 8px rgba(56,139,253,0.5))}50%{filter:drop-shadow(0 0 18px rgba(56,139,253,0.9))}}
+.brand-name{font-family:'Orbitron',monospace;font-size:1rem;font-weight:700;letter-spacing:2px;color:var(--blue);text-shadow:0 0 12px rgba(56,139,253,0.5)}
+.brand-sub{font-size:0.65rem;color:var(--text-dim);letter-spacing:3px;text-transform:uppercase;margin-top:1px}
+.topbar-right{display:flex;align-items:center;gap:16px}
+#token-indicator{width:10px;height:10px;border-radius:50%;flex-shrink:0;transition:background 0.3s}
+#token-indicator.active{background:var(--green);box-shadow:0 0 8px var(--green)}
+#token-indicator.inactive{background:var(--red);box-shadow:0 0 8px var(--red)}
+.user-chip{display:flex;align-items:center;gap:8px;padding:5px 14px 5px 6px;border-radius:30px;background:var(--surface2);border:1px solid var(--border);font-size:0.8rem;color:var(--text-dim)}
+.user-avatar{width:28px;height:28px;border-radius:50%;background:linear-gradient(135deg,#1565c0,var(--blue));display:grid;place-items:center;font-size:0.75rem;font-weight:700;color:#fff}
+.status-pill{display:flex;align-items:center;gap:6px;font-size:0.75rem;padding:4px 12px;border-radius:20px;border:1px solid;cursor:pointer;transition:all 0.2s;font-weight:500}
+.status-pill.off{border-color:rgba(248,81,73,0.4);color:var(--red);background:rgba(248,81,73,0.08)}
+.status-pill.on{border-color:rgba(63,185,80,0.4);color:var(--green);background:rgba(63,185,80,0.08)}
+.status-pill .dot{width:7px;height:7px;border-radius:50%;background:currentColor}
+.status-pill.on .dot{box-shadow:0 0 6px currentColor;animation:blink 1.8s ease-in-out infinite}
+@keyframes blink{0%,100%{opacity:1}50%{opacity:0.4}}
+
+.layout{display:flex;flex:1;overflow:hidden;min-height:0;}
+.sidebar{width:220px;flex-shrink:0;background:var(--surface);border-right:1px solid var(--border2);display:flex;flex-direction:column;padding:16px 0;overflow-y:auto}
+.sidebar-section{padding:8px 16px 4px;font-size:0.65rem;letter-spacing:2px;text-transform:uppercase;color:var(--text-dim);font-weight:600}
+.nav-item{display:flex;align-items:center;gap:10px;padding:9px 20px;margin:1px 8px;border-radius:8px;font-size:0.85rem;color:var(--text-dim);cursor:pointer;transition:all 0.15s;border:1px solid transparent;user-select:none}
+.nav-item:hover{background:var(--blue-dim);color:var(--text);border-color:var(--border2)}
+.nav-item.active{background:rgba(56,139,253,0.15);color:var(--blue);border-color:rgba(56,139,253,0.25);font-weight:500}
+.nav-item .ni{font-size:1rem;width:18px;text-align:center}
+.nav-badge{margin-left:auto;font-size:0.65rem;padding:1px 7px;border-radius:10px;background:rgba(56,139,253,0.2);color:var(--blue);font-weight:700}
+.sidebar-divider{height:1px;background:var(--border2);margin:10px 16px}
+.sidebar-bottom{margin-top:auto}
+
+#main-col{flex:1;min-width:0;min-height:0;overflow:hidden;display:flex;flex-direction:column;}
+
+.page{display:none!important;}
+.page.active{display:flex!important;flex:1;min-height:0;min-width:0;flex-direction:column;overflow:hidden;}
+@keyframes fadeIn{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:translateY(0)}}
+.page-hdr{padding:14px 28px;border-bottom:1px solid var(--border2);flex-shrink:0;display:flex;align-items:center;justify-content:space-between;gap:12px}
+.page-hdr-left h2{font-family:'Orbitron',monospace;font-size:1rem;font-weight:700;letter-spacing:1px}
+.page-hdr-left p{font-size:0.75rem;color:var(--text-dim);margin-top:2px}
+.page-body{flex:1;overflow-y:auto;padding:22px 28px}
+.page-section{margin-bottom:28px}
+.page-section-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;padding-bottom:8px;border-bottom:1px solid var(--border2)}
+.page-section-head h3{font-family:'Orbitron',monospace;font-size:0.82rem;font-weight:600;letter-spacing:1px;color:var(--blue)}
+
+.badge{font-size:0.65rem;padding:2px 8px;border-radius:10px;font-weight:700;letter-spacing:0.5px}
+.badge-blue{background:rgba(56,139,253,0.15);color:var(--blue);border:1px solid rgba(56,139,253,0.3)}
+.badge-green{background:rgba(63,185,80,0.12);color:var(--green);border:1px solid rgba(63,185,80,0.25)}
+.badge-gold{background:rgba(240,192,96,0.12);color:var(--gold);border:1px solid rgba(240,192,96,0.25)}
+.badge-red{background:rgba(248,81,73,0.12);color:var(--red);border:1px solid rgba(248,81,73,0.25)}
+.badge-silver{background:rgba(139,148,158,0.12);color:var(--silver);border:1px solid rgba(139,148,158,0.25)}
+
+.btn{display:inline-flex;align-items:center;gap:7px;padding:8px 16px;border-radius:8px;border:1.5px solid;font-family:'DM Sans',sans-serif;font-size:0.82rem;font-weight:600;cursor:pointer;transition:all 0.18s}
+.btn-primary{border-color:var(--blue);background:rgba(56,139,253,0.15);color:var(--blue)}
+.btn-primary:hover{background:rgba(56,139,253,0.28);box-shadow:var(--glow)}
+.btn-danger{border-color:rgba(248,81,73,0.5);background:rgba(248,81,73,0.08);color:var(--red)}
+.btn-danger:hover{background:rgba(248,81,73,0.18)}
+.btn-ghost{border-color:var(--border);background:transparent;color:var(--text-dim)}
+.btn-ghost:hover{background:var(--blue-dim);color:var(--text);border-color:var(--border)}
+.btn-sm{padding:5px 11px;font-size:0.75rem;border-radius:6px}
+
+.data-table{width:100%;border-collapse:collapse;font-size:0.82rem}
+.data-table th{padding:9px 14px;text-align:left;font-size:0.68rem;letter-spacing:1.2px;text-transform:uppercase;color:var(--text-dim);border-bottom:1px solid var(--border2);font-weight:600;white-space:nowrap}
+.data-table td{padding:10px 14px;border-bottom:1px solid var(--border2);color:var(--text);vertical-align:middle}
+.data-table tr:last-child td{border-bottom:none}
+.data-table tr:hover td{background:rgba(56,139,253,0.04)}
+.actions-cell{display:flex;align-items:center;gap:6px}
+
+.progress-bar{height:5px;background:var(--surface2);border-radius:3px;overflow:hidden;margin-top:4px;min-width:80px}
+.progress-fill{height:100%;border-radius:3px;transition:width 0.5s ease}
+
+.kpi-strip{display:flex;border-bottom:1px solid var(--border2);flex-shrink:0;overflow-x:auto}
+.kpi{flex:1;min-width:140px;padding:14px 22px;border-right:1px solid var(--border2);position:relative;overflow:hidden}
+.kpi:last-child{border-right:none}
+.kpi::before{content:'';position:absolute;top:0;left:0;right:0;height:2px}
+.kpi.b::before{background:linear-gradient(90deg,#1565c0,var(--blue))}.kpi.g::before{background:linear-gradient(90deg,#2ea043,var(--green))}.kpi.o::before{background:linear-gradient(90deg,#e65100,var(--gold))}.kpi.s::before{background:linear-gradient(90deg,#455a64,var(--silver))}
+.kpi-label{font-size:0.68rem;letter-spacing:1.5px;text-transform:uppercase;color:var(--text-dim)}
+.kpi-val{font-family:'Orbitron',monospace;font-size:1.6rem;font-weight:700;line-height:1.2;margin:4px 0 2px}
+.kpi.b .kpi-val{color:var(--blue)}.kpi.g .kpi-val{color:var(--green)}.kpi.o .kpi-val{color:var(--gold)}.kpi.s .kpi-val{color:var(--silver)}
+.kpi-sub{font-size:0.7rem;color:var(--text-dim)}
+
+.dash-panels{display:flex;flex:1;overflow:hidden}
+.left-panel{width:300px;flex-shrink:0;border-right:1px solid var(--border2);display:flex;flex-direction:column;overflow:hidden}
+.panel-head{padding:14px 18px;display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid var(--border2);flex-shrink:0}
+.panel-head-title{font-size:0.8rem;font-weight:600;letter-spacing:0.5px;display:flex;align-items:center;gap:7px}
+.task-list-panel{flex:1;overflow-y:auto;padding:8px}
+.task-item-dash{display:flex;align-items:center;gap:10px;padding:9px 10px;border-radius:8px;margin-bottom:2px;border:1px solid transparent;transition:background 0.12s}
+.task-item-dash:hover{background:var(--blue-dim);border-color:var(--border2)}
+.task-cb{width:16px;height:16px;border-radius:4px;border:1.5px solid var(--silver);flex-shrink:0;display:grid;place-items:center;cursor:pointer;transition:all 0.15s}
+.task-cb.done{background:var(--green);border-color:var(--green)}
+.task-cb.done::after{content:'✓';font-size:10px;color:#fff;font-weight:700}
+.task-name-d{flex:1;font-size:0.82rem;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.task-name-d.done{text-decoration:line-through;color:var(--text-dim)}
+.task-pri{font-size:0.65rem;padding:2px 7px;border-radius:8px;font-weight:700;flex-shrink:0}
+.pri-h{background:rgba(248,81,73,0.15);color:var(--red)}.pri-m{background:rgba(240,192,96,0.15);color:var(--gold)}.pri-l{background:rgba(63,185,80,0.12);color:var(--green)}
+
+.right-panel{flex:1;display:flex;flex-direction:column;overflow:hidden}
+.od-connect-screen{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:18px;padding:40px;text-align:center}
+.od-connect-icon{font-size:4rem;opacity:0.25;margin-bottom:6px}
+.od-connect-screen h2{font-family:'Orbitron',monospace;font-size:1rem;color:var(--text-dim)}
+.od-connect-screen p{font-size:0.82rem;color:var(--text-dim);max-width:360px;line-height:1.75}
+.btn-connect{padding:12px 32px;border-radius:9px;border:1.5px solid var(--blue);background:rgba(56,139,253,0.12);color:var(--blue);font-family:'DM Sans',sans-serif;font-size:0.9rem;font-weight:600;cursor:pointer;transition:all 0.2s;display:flex;align-items:center;gap:10px}
+.btn-connect:hover{background:rgba(56,139,253,0.22);box-shadow:var(--glow-s)}
+.ms-logo{width:18px;height:18px;display:grid;grid-template-columns:1fr 1fr;gap:2px;flex-shrink:0}
+.ms-logo span{border-radius:1px}
+.ms-logo span:nth-child(1){background:#f25022}.ms-logo span:nth-child(2){background:#7fba00}
+.ms-logo span:nth-child(3){background:#00a4ef}.ms-logo span:nth-child(4){background:#ffb900}
+.od-ui{flex:1;display:flex;flex-direction:column;overflow:hidden}
+.od-toolbar{padding:10px 18px;display:flex;align-items:center;gap:10px;border-bottom:1px solid var(--border2);flex-shrink:0;flex-wrap:wrap}
+.search-wrap{flex:1;min-width:180px;position:relative}
+.mobile-search-bar{display:flex;padding:10px 16px 8px;gap:10px;align-items:flex-start;flex-shrink:0;border-bottom:1px solid var(--border2);background:var(--surface)}
+.search-wrap input,.modal-input{width:100%;padding:8px 12px;border-radius:8px;border:1px solid var(--border);background:var(--surface2);color:var(--text);font-family:'DM Sans',sans-serif;font-size:0.83rem;outline:none;transition:border-color 0.2s}
+.search-wrap input{padding-left:34px}
+.search-wrap input:focus,.modal-input:focus{border-color:var(--blue);box-shadow:0 0 0 3px rgba(56,139,253,0.1)}
+.search-wrap input::placeholder,.modal-input::placeholder{color:var(--text-dim)}
+.search-icon{position:absolute;left:10px;top:50%;transform:translateY(-50%);color:var(--text-dim);font-size:0.85rem;pointer-events:none}
+.od-view-btn{padding:7px 13px;border-radius:7px;border:1px solid var(--border);background:var(--surface2);color:var(--text-dim);cursor:pointer;font-size:0.85rem;transition:all 0.15s;font-family:'DM Sans',sans-serif}
+.od-view-btn:hover,.od-view-btn.active{background:var(--blue-dim);color:var(--blue);border-color:rgba(56,139,253,0.3)}
+.od-path{padding:8px 18px;font-size:0.75rem;color:var(--text-dim);border-bottom:1px solid var(--border2);flex-shrink:0;display:flex;align-items:center;gap:4px;flex-wrap:wrap}
+.crumb{cursor:pointer;transition:color 0.15s;padding:2px 5px;border-radius:4px}
+.crumb:hover{color:var(--blue);background:var(--blue-dim)}
+.crumb.last{color:var(--text);cursor:default}
+.od-path-sep{opacity:0.3}
+.od-files{flex:1;overflow-y:auto;padding:14px 18px}
+.file-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(130px,1fr));gap:12px}
+.file-card{display:flex;flex-direction:column;align-items:center;gap:8px;padding:16px 10px 12px;border-radius:10px;border:1px solid var(--border2);background:var(--surface2);cursor:pointer;transition:all 0.15s;text-align:center;position:relative}
+.file-card:hover{border-color:rgba(56,139,253,0.35);background:var(--blue-dim);box-shadow:var(--glow)}
+.file-card.selected{border-color:var(--blue);background:rgba(56,139,253,0.1)}
+.file-icon{font-size:2.2rem;line-height:1}
+.file-name{font-size:0.72rem;word-break:break-word;color:var(--text);line-height:1.3}
+.file-size{font-size:0.65rem;color:var(--text-dim)}
+.file-dl-btn{position:absolute;top:6px;right:6px;width:22px;height:22px;border-radius:5px;background:rgba(56,139,253,0.2);border:1px solid rgba(56,139,253,0.3);color:var(--blue);font-size:0.75rem;display:none;place-items:center;cursor:pointer}
+.file-card:hover .file-dl-btn{display:grid}
+.file-star{position:absolute;top:6px;left:6px;width:22px;height:22px;border-radius:5px;background:rgba(240,192,96,0.1);border:1px solid rgba(240,192,96,0.2);color:#888;font-size:0.75rem;display:none;place-items:center;cursor:pointer;transition:all 0.15s;line-height:1}
+.file-card:hover .file-star{display:grid}
+.file-star.starred{display:grid!important;color:var(--gold);background:rgba(240,192,96,0.2);border-color:rgba(240,192,96,0.4)}
+.file-star:hover{background:rgba(240,192,96,0.25);border-color:rgba(240,192,96,0.5);color:var(--gold)}
+/* list view star */
+.file-row .rs-star{width:26px;height:26px;border-radius:6px;flex-shrink:0;background:transparent;border:1px solid transparent;color:#556;font-size:0.85rem;display:grid;place-items:center;cursor:pointer;transition:all 0.15s;opacity:0}
+.file-row:hover .rs-star{opacity:1;border-color:rgba(240,192,96,0.3);background:rgba(240,192,96,0.08);color:var(--gold)}
+.file-row .rs-star.starred{opacity:1!important;color:var(--gold);background:rgba(240,192,96,0.15);border-color:rgba(240,192,96,0.35)}
+/* mobile always show */
+@media(max-width:768px){.file-star{display:grid!important}.file-row .rs-star{opacity:1!important}}
+.file-list-view{display:flex;flex-direction:column;gap:2px}
+.file-row{display:flex;align-items:center;gap:12px;padding:9px 12px;border-radius:7px;border:1px solid transparent;cursor:pointer;transition:all 0.12s}
+.file-row:hover{background:var(--blue-dim);border-color:var(--border2)}
+.file-row .ri{font-size:1.2rem;width:24px;text-align:center;flex-shrink:0}
+.file-row .rn{flex:1;font-size:0.82rem;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.file-row .rm{font-size:0.72rem;color:var(--text-dim);width:90px;text-align:right;flex-shrink:0}
+.file-row .rs{font-size:0.72rem;color:var(--text-dim);width:65px;text-align:right;flex-shrink:0}
+.file-row .rd{width:26px;height:26px;border-radius:6px;flex-shrink:0;background:rgba(56,139,253,0.15);border:1px solid rgba(56,139,253,0.25);color:var(--blue);font-size:0.8rem;display:grid;place-items:center;cursor:pointer;opacity:0;transition:opacity 0.15s}
+.file-row:hover .rd{opacity:1}
+.od-statusbar{padding:7px 18px;border-top:1px solid var(--border2);display:flex;align-items:center;justify-content:space-between;font-size:0.7rem;color:var(--text-dim);flex-shrink:0;background:var(--surface)}
+.search-chip{
+  padding:4px 11px;border-radius:20px;border:1px solid var(--border);
+  background:var(--surface2);color:var(--text-dim);font-size:0.72rem;
+  cursor:pointer;transition:all 0.15s;font-family:'DM Sans',sans-serif;white-space:nowrap;
+}
+.search-chip.active{background:var(--blue-dim);color:var(--blue);border-color:rgba(56,139,253,0.4);font-weight:600}
+.search-chip:hover:not(.active){border-color:var(--border);color:var(--text)}
+.od-pagination{display:flex;align-items:center;gap:6px;flex-shrink:0}
+.od-pg-btn{padding:4px 10px;border-radius:6px;border:1px solid var(--border);background:var(--surface2);color:var(--text-dim);font-size:0.75rem;cursor:pointer;transition:all 0.15s;font-family:'DM Sans',sans-serif}
+.od-pg-btn:hover:not(:disabled){background:var(--blue-dim);color:var(--blue);border-color:rgba(56,139,253,0.3)}
+.od-pg-btn:disabled{opacity:0.3;cursor:not-allowed}
+.od-pg-info{font-size:0.72rem;color:var(--text-dim)}
+.od-statusbar .conn-info{display:flex;align-items:center;gap:6px}
+.od-statusbar .dot{width:6px;height:6px;border-radius:50%;background:var(--green);box-shadow:0 0 5px var(--green)}
+.od-state-screen{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px;padding:40px;text-align:center;color:var(--text-dim)}
+.err-detail{font-size:0.72rem;color:var(--red);background:rgba(248,81,73,0.08);padding:8px 14px;border-radius:6px;border:1px solid rgba(248,81,73,0.2);max-width:400px;word-break:break-word}
+.btn-retry{padding:9px 24px;border-radius:8px;border:1px solid var(--blue);background:var(--blue-dim);color:var(--blue);font-family:'DM Sans',sans-serif;font-size:0.85rem;font-weight:600;cursor:pointer}
+
+.team-card{display:flex;align-items:center;gap:14px;padding:12px 16px;background:var(--surface2);border:1px solid var(--border2);border-radius:10px;margin-bottom:8px;transition:all 0.15s}
+.team-card:hover{border-color:rgba(56,139,253,0.25);box-shadow:var(--glow)}
+.av{width:38px;height:38px;border-radius:50%;display:grid;place-items:center;font-size:0.82rem;font-weight:700;color:#fff;flex-shrink:0}
+.av-info{flex:1;min-width:0}
+.av-name{font-size:0.88rem;font-weight:600}
+.av-role{font-size:0.72rem;color:var(--text-dim)}
+.av-status{font-size:0.7rem;padding:2px 9px;border-radius:10px;flex-shrink:0}
+.av-status.online{background:rgba(63,185,80,0.12);color:var(--green)}
+.av-status.away{background:rgba(240,192,96,0.12);color:var(--gold)}
+.av-status.offline{background:rgba(139,148,158,0.12);color:var(--silver)}
+
+.project-card{background:var(--surface2);border:1px solid var(--border2);border-radius:12px;padding:18px;margin-bottom:10px;transition:all 0.15s}
+.project-card:hover{border-color:rgba(56,139,253,0.25);box-shadow:var(--glow)}
+.project-card-top{display:flex;align-items:flex-start;justify-content:space-between;gap:10px;margin-bottom:10px}
+.project-card-title{font-weight:600;font-size:0.9rem}
+.project-card-desc{font-size:0.75rem;color:var(--text-dim);margin-top:2px}
+.project-card-bottom{display:flex;align-items:center;justify-content:space-between;margin-top:10px;font-size:0.72rem;color:var(--text-dim)}
+
+.modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,0.7);z-index:1000;display:none;align-items:center;justify-content:center;backdrop-filter:blur(4px)}
+.modal-overlay.open{display:flex}
+.modal{background:var(--surface);border:1px solid var(--border);border-radius:16px;padding:28px;width:100%;max-width:460px;box-shadow:var(--glow-s);animation:fadeIn 0.2s ease}
+.modal-title{font-family:'Orbitron',monospace;font-size:0.95rem;font-weight:700;margin-bottom:20px;color:var(--text);display:flex;align-items:center;gap:9px}
+.modal-field{margin-bottom:14px}
+.modal-field label{display:block;font-size:0.75rem;color:var(--text-dim);margin-bottom:5px;letter-spacing:0.3px}
+.modal-input{display:block}
+.modal-input option{background:var(--surface2)}
+.modal-footer{display:flex;justify-content:flex-end;gap:10px;margin-top:22px}
+
+.confirm-modal{max-width:360px;text-align:center}
+.confirm-modal .confirm-icon{font-size:2.5rem;margin-bottom:10px;opacity:0.8}
+.confirm-modal p{font-size:0.85rem;color:var(--text-dim);line-height:1.6;margin-bottom:4px}
+.confirm-modal .confirm-name{font-weight:600;color:var(--text)}
+
+.spinner{width:34px;height:34px;border:3px solid var(--border);border-top-color:var(--blue);border-radius:50%;animation:spin 0.8s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+.od-loading-inline{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px;padding:60px;color:var(--text-dim);font-size:0.85rem}
+.no-results{display:flex;flex-direction:column;align-items:center;justify-content:center;flex:1;gap:10px;color:var(--text-dim);font-size:0.85rem;padding:60px;text-align:center}
+.no-results span{font-size:2.5rem;opacity:0.3}
+.empty-state{text-align:center;padding:50px 20px;color:var(--text-dim)}
+.empty-state span{font-size:2.5rem;display:block;margin-bottom:10px;opacity:0.3}
+.empty-state p{font-size:0.85rem}
+.toast{position:fixed;bottom:24px;right:24px;padding:10px 18px;border-radius:8px;background:#1a2740;border:1px solid var(--blue);color:var(--text);font-size:0.8rem;font-weight:500;box-shadow:var(--glow-s);z-index:9998;transform:translateY(20px);opacity:0;transition:all 0.3s;pointer-events:none;max-width:320px}
+.toast.show{transform:translateY(0);opacity:1}
+::-webkit-scrollbar{width:5px;height:5px}::-webkit-scrollbar-track{background:transparent}::-webkit-scrollbar-thumb{background:rgba(56,139,253,0.2);border-radius:3px}
+.chart-bars{display:flex;align-items:flex-end;gap:10px;height:120px;padding:10px 0}
+.bar-wrap{display:flex;flex-direction:column;align-items:center;gap:6px;flex:1}
+.bar{width:100%;border-radius:4px 4px 0 0;min-height:4px}
+.bar-label{font-size:0.68rem;color:var(--text-dim)}
+.bar-val{font-size:0.7rem;color:var(--text);font-weight:600}
+.settings-group{background:var(--surface2);border:1px solid var(--border2);border-radius:10px;padding:18px;margin-bottom:16px}
+.settings-group label{display:block;font-size:0.78rem;color:var(--text-dim);margin-bottom:5px;margin-top:12px}
+.settings-group label:first-child{margin-top:0}
+.settings-toggle{display:flex;align-items:center;justify-content:space-between;padding:10px 0;border-bottom:1px solid var(--border2)}
+
+#notif-banner{position:fixed;top:68px;right:16px;z-index:1500;display:flex;flex-direction:column;gap:8px;pointer-events:none;max-width:340px;}
+.notif-card{background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:12px 16px;display:flex;align-items:flex-start;gap:10px;box-shadow:0 4px 20px rgba(0,0,0,0.4);pointer-events:all;animation:slideInRight 0.3s ease;}
+.notif-card.urgent{border-color:rgba(248,81,73,0.5);background:rgba(248,81,73,0.08);}
+.notif-card.warning{border-color:rgba(240,192,96,0.5);background:rgba(240,192,96,0.08);}
+.notif-card.info{border-color:rgba(56,139,253,0.5);background:rgba(56,139,253,0.08);}
+.notif-icon{font-size:1.3rem;flex-shrink:0;margin-top:1px;}
+.notif-body{flex:1;min-width:0;}
+.notif-title{font-size:0.82rem;font-weight:600;color:var(--text);margin-bottom:2px;}
+.notif-msg{font-size:0.75rem;color:var(--text-dim);line-height:1.4;}
+.notif-close{background:none;border:none;color:var(--text-dim);cursor:pointer;font-size:1rem;padding:0 0 0 6px;line-height:1;flex-shrink:0;}
+.notif-close:hover{color:var(--text);}
+@keyframes slideInRight{from{opacity:0;transform:translateX(40px)}to{opacity:1;transform:translateX(0)}}
+.notif-dismiss{font-size:0.7rem;color:var(--blue);cursor:pointer;margin-top:4px;display:inline-block;}
+
+#nb-reminders{background:var(--red);}
+.settings-toggle:last-child{border-bottom:none;padding-bottom:0}
+.toggle-label{font-size:0.85rem}.toggle-desc{font-size:0.72rem;color:var(--text-dim);margin-top:2px}
+.toggle-sw{width:38px;height:20px;border-radius:10px;background:var(--border);cursor:pointer;position:relative;transition:background 0.2s;flex-shrink:0}
+.toggle-sw.on{background:var(--blue)}
+.toggle-sw::after{content:'';position:absolute;top:3px;left:3px;width:14px;height:14px;border-radius:50%;background:#fff;transition:transform 0.2s}
+.toggle-sw.on::after{transform:translateX(18px)}
+
+#login-screen{
+  padding:24px;
+  background-image:
+    radial-gradient(ellipse 80% 50% at 50% -10%, rgba(56,139,253,0.18) 0%, transparent 60%),
+    repeating-linear-gradient(0deg,transparent,transparent 40px,rgba(56,139,253,0.02) 40px,rgba(56,139,253,0.02) 41px),
+    repeating-linear-gradient(90deg,transparent,transparent 40px,rgba(56,139,253,0.02) 40px,rgba(56,139,253,0.02) 41px);
+}
+#login-screen.hidden{display:none}
+.login-card{
+  width:100%;max-width:400px;
+  background:rgba(12,21,38,0.9);
+  border:1px solid rgba(56,139,253,0.25);
+  border-radius:20px;
+  padding:40px 36px 32px;
+  box-shadow:0 0 60px rgba(56,139,253,0.12),0 24px 48px rgba(0,0,0,0.5);
+  backdrop-filter:blur(20px);
+  position:relative;overflow:hidden;
+}
+.login-card::before{
+  content:'';position:absolute;top:0;left:0;right:0;height:2px;
+  background:linear-gradient(90deg,transparent,var(--blue),var(--gold),var(--blue),transparent);
+}
+.login-logo-wrap{display:flex;flex-direction:column;align-items:center;gap:10px;margin-bottom:32px}
+.login-logo{width:72px;height:72px;object-fit:contain;filter:drop-shadow(0 0 18px rgba(56,139,253,0.7));animation:logoPulse 3s ease-in-out infinite}
+.login-logo-fallback{width:72px;height:72px;border-radius:16px;background:linear-gradient(135deg,#0a1428,#1565c0);display:grid;place-items:center;font-size:2rem;box-shadow:0 0 20px rgba(56,139,253,0.4)}
+.login-title{font-family:'Orbitron',monospace;font-size:1.3rem;font-weight:900;color:var(--text);letter-spacing:3px;text-align:center}
+.login-subtitle{font-size:0.72rem;color:var(--text-dim);letter-spacing:2px;text-transform:uppercase;text-align:center;margin-top:2px}
+.login-field{margin-bottom:16px;position:relative}
+.login-field label{display:block;font-size:0.72rem;color:var(--text-dim);margin-bottom:6px;letter-spacing:0.5px;text-transform:uppercase}
+.login-input{
+  width:100%;padding:12px 16px;
+  border-radius:10px;border:1px solid var(--border);
+  background:rgba(7,13,26,0.8);
+  color:var(--text);font-family:'DM Sans',sans-serif;font-size:0.9rem;
+  outline:none;transition:all 0.2s;
+}
+.login-input:focus{border-color:var(--blue);box-shadow:0 0 0 3px rgba(56,139,253,0.12)}
+.login-input::placeholder{color:var(--text-dim)}
+.login-remember{display:flex;align-items:center;gap:10px;margin:16px 0 20px;cursor:pointer;user-select:none}
+.login-remember input{width:16px;height:16px;accent-color:var(--blue);cursor:pointer}
+.login-remember span{font-size:0.82rem;color:var(--text-dim)}
+.login-btn{
+  width:100%;padding:13px;border-radius:10px;
+  border:1.5px solid var(--blue);
+  background:linear-gradient(135deg,rgba(56,139,253,0.2),rgba(56,139,253,0.1));
+  color:var(--text);font-family:'Orbitron',monospace;font-size:0.85rem;font-weight:700;
+  letter-spacing:2px;cursor:pointer;transition:all 0.2s;
+  box-shadow:0 0 20px rgba(56,139,253,0.1);
+}
+.login-btn:hover{background:linear-gradient(135deg,rgba(56,139,253,0.35),rgba(56,139,253,0.2));box-shadow:0 0 30px rgba(56,139,253,0.3)}
+.login-btn:active{transform:scale(0.98)}
+.login-error{
+  background:rgba(248,81,73,0.1);border:1px solid rgba(248,81,73,0.3);
+  border-radius:8px;padding:10px 14px;font-size:0.8rem;color:var(--red);
+  margin-bottom:16px;display:none;text-align:center;
+}
+.login-footer{text-align:center;margin-top:20px;font-size:0.7rem;color:var(--text-dim);opacity:0.5;letter-spacing:1px}
+
+/* Hamburger button */
+.hamburger{display:none;flex-direction:column;justify-content:center;gap:5px;width:38px;height:38px;cursor:pointer;padding:6px;border-radius:8px;border:1px solid var(--border);background:transparent;flex-shrink:0}
+.hamburger span{display:block;height:2px;background:var(--text);border-radius:2px;transition:all 0.25s}
+.hamburger.open span:nth-child(1){transform:translateY(7px) rotate(45deg)}
+.hamburger.open span:nth-child(2){opacity:0;transform:scaleX(0)}
+.hamburger.open span:nth-child(3){transform:translateY(-7px) rotate(-45deg)}
+
+/* Sidebar overlay for mobile */
+.sidebar-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,0.6);z-index:199;backdrop-filter:blur(2px)}
+.sidebar-overlay.open{display:block}
+
+/* Bottom nav bar for mobile */
+.bottom-nav-inner{display:flex;align-items:center;justify-content:space-around}
+.bn-item{display:flex;flex-direction:column;align-items:center;gap:2px;padding:5px 6px;border-radius:8px;cursor:pointer;transition:all 0.15s;min-width:44px;border:none;background:transparent;color:var(--text-dim);font-family:'DM Sans',sans-serif}
+.bn-item.active{color:var(--blue)}
+.bn-item .bn-icon{font-size:1.3rem;line-height:1}
+.bn-item .bn-label{font-size:0.6rem;letter-spacing:0.3px;font-weight:600;text-transform:uppercase}
+.bn-badge{position:absolute;top:-2px;right:-4px;background:var(--blue);color:#fff;font-size:0.55rem;font-weight:700;padding:1px 4px;border-radius:8px;line-height:1.4}
+.bn-item-wrap{position:relative;display:flex;align-items:center;justify-content:center}
+
+@media (max-width: 768px) {
+  /* show hamburger, hide desktop sidebar */
+  .hamburger{display:flex}
+  html,body{overflow:hidden;height:100%;height:100dvh;}
+
+  /* Sidebar becomes a slide-in drawer */
+  .sidebar{
+    position:fixed;top:0;left:0;bottom:0;z-index:200;
+    width:260px;
+    transform:translateX(-100%);
+    transition:transform 0.28s cubic-bezier(0.4,0,0.2,1);
+    box-shadow:4px 0 24px rgba(0,0,0,0.5);
+    padding-top:70px;
+  }
+  .sidebar.open{transform:translateX(0)}
+
+  /* Topbar tweaks */
+  .topbar{padding:0 14px;height:56px}
+  .brand-sub{display:none}
+  .brand-name{font-size:0.85rem;letter-spacing:1.5px}
+  .brand img{width:34px;height:34px}
+  .status-pill span{display:none} /* hide text, keep dot */
+  .status-pill{padding:6px 8px}
+  .user-chip span{display:none}
+  .user-chip{padding:4px}
+
+  /* Layout: sidebar hidden (fixed drawer), content fills */
+  .layout{flex-direction:row}
+  .sidebar{display:none}
+  .sidebar.open{display:flex}
+  #main-col{flex:1;}
+
+  /* Pages */
+  .page-body{padding:16px 14px 24px;overflow-y:auto;-webkit-overflow-scrolling:touch;flex:1;min-height:0}
+  .page-hdr{padding:12px 16px;flex-wrap:wrap;gap:8px}
+
+  /* KPI strip: 2x2 grid on mobile */
+  .kpi-strip{display:grid;grid-template-columns:1fr 1fr;overflow:visible}
+  .kpi{border-right:none;border-bottom:1px solid var(--border2);padding:12px 14px;min-width:unset}
+  .kpi:nth-child(1),.kpi:nth-child(2){border-right:1px solid var(--border2)}
+  .kpi:nth-child(3),.kpi:nth-child(4){border-bottom:none}
+  .kpi:nth-child(odd){border-right:1px solid var(--border2)}
+  .kpi-val{font-size:1.3rem}
+
+  /* Dashboard: stack panels vertically */
+  .dash-panels{flex-direction:column;overflow-y:auto;overflow-x:hidden;padding-bottom:16px;-webkit-overflow-scrolling:touch;flex:1;min-height:0}
+  .left-panel{width:100%;border-right:none;border-bottom:1px solid var(--border2);max-height:340px}
+  /* mobile-search-bar already flex on all sizes */
+  .right-panel{min-height:300px}
+  /* Hide OneDrive panel on dashboard on mobile — use Drive tab instead */
+  #od-right{display:none!important}
+  /* Tasks panel takes full width on mobile since OD panel is hidden */
+  .left-panel{max-height:none!important;border-bottom:none!important;flex:1}
+
+  /* Tables: horizontal scroll */
+  .page-section{overflow-x:auto}
+  .data-table{min-width:520px}
+  .data-table th,.data-table td{padding:8px 10px}
+
+  /* Project cards: full width */
+  .project-card{margin-bottom:10px}
+  .project-card-top{flex-wrap:wrap;gap:8px}
+
+  /* Team cards */
+  .team-card{flex-wrap:wrap;gap:10px}
+  .team-card .btn{padding:6px 10px;font-size:0.72rem}
+
+  /* Modals */
+  .modal{margin:16px;max-width:calc(100vw - 32px);max-height:calc(100vh - 80px);overflow-y:auto}
+  .modal-overlay{align-items:flex-end;padding-bottom:0}
+  .modal{border-radius:16px 16px 0 0;margin:0;max-width:100%;width:100%;animation:slideUp 0.25s ease}
+  @keyframes slideUp{from{transform:translateY(100%)}to{transform:translateY(0)}}
+  .confirm-modal{border-radius:16px 16px 0 0}
+
+  /* OneDrive toolbar wrap */
+  .od-toolbar{padding:8px 12px;gap:8px}
+  .od-toolbar .od-view-btn{padding:6px 10px;font-size:0.8rem}
+  .od-files{padding:10px 12px;padding-bottom:16px;overflow-y:auto;-webkit-overflow-scrolling:touch}
+
+  /* File grid tighter */
+    grid-template-columns: 1fr;
+    .file-card {
+        padding: 12px 8px 10px
+    }
+  .file-icon{font-size:1.8rem}
+  .file-name{font-size:0.68rem}
+  .file-dl-btn{display:grid!important} /* always show download on mobile */
+
+  #bottom-nav-outer{display:block;}
+
+  /* Toast above bottom nav */
+  .toast{bottom:80px}
+
+  /* Reports chart */
+  .chart-bars{height:90px}
+
+  /* Page header button sizing */
+  .btn{min-height:38px;padding:8px 14px}
+  .btn-sm{min-height:32px;padding:5px 10px}
+
+  /* Task item bigger touch targets */
+  .task-item-dash{padding:12px 10px;min-height:48px}
+  .task-cb{width:20px;height:20px}
+}
+
+@media (max-width: 380px) {
+  .kpi-val{font-size:1.1rem}
+  .file-grid{grid-template-columns:repeat(3,1fr)}
+  .bottom-nav-inner{gap:0}
+  .bn-item{min-width:38px;padding:4px 3px}
+  .bn-label{font-size:0.55rem!important}
+}
+
+/* estimator page */
+.est-upload-zone{border:2px dashed var(--border);border-radius:12px;padding:40px;text-align:center;cursor:pointer;transition:all 0.2s;background:var(--surface);position:relative;overflow:hidden}
+.est-upload-zone:hover,.est-upload-zone.drag{border-color:var(--blue);background:var(--blue-dim)}
+.est-upload-icon{font-size:2.5rem;margin-bottom:10px}
+.est-upload-text{font-size:0.85rem;color:var(--text-dim)}
+.est-upload-text strong{color:var(--text)}
+.est-form{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:20px}
+@media(max-width:768px){.est-form{grid-template-columns:1fr}}
+.est-section{margin-bottom:24px}
+.est-section-title{font-size:0.78rem;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:var(--blue);margin-bottom:10px;padding-bottom:6px;border-bottom:1px solid var(--border2)}
+.est-table{width:100%;border-collapse:collapse;font-size:0.82rem}
+.est-table th{text-align:left;padding:8px 10px;border-bottom:1px solid var(--border2);color:var(--text-dim);font-weight:600;font-size:0.75rem;text-transform:uppercase;letter-spacing:0.5px}
+.est-table td{padding:8px 10px;border-bottom:1px solid var(--border2);vertical-align:top}
+.est-table tr:last-child td{border-bottom:none}
+.est-table .sku{font-size:0.72rem;color:var(--text-dim);font-family:monospace}
+.est-total-row td{font-weight:700;color:var(--text);border-top:2px solid var(--border);padding-top:12px}
+.est-grand-total{background:linear-gradient(135deg,rgba(56,139,253,0.1),rgba(56,139,253,0.05));border:1px solid rgba(56,139,253,0.2);border-radius:10px;padding:16px 20px;display:flex;justify-content:space-between;align-items:center;margin-top:20px}
+.est-grand-total-label{font-size:0.85rem;color:var(--text-dim)}
+.est-grand-total-val{font-family:'Orbitron',monospace;font-size:1.4rem;font-weight:700;color:var(--blue)}
+.est-ai-status{display:flex;align-items:center;gap:10px;padding:12px 16px;background:var(--surface2);border-radius:8px;border:1px solid var(--border2);font-size:0.82rem;color:var(--text-dim);margin-bottom:16px}
+.est-spinner{width:16px;height:16px;border:2px solid var(--border);border-top-color:var(--blue);border-radius:50%;animation:spin 0.7s linear infinite;flex-shrink:0}
+@keyframes spin{to{transform:rotate(360deg)}}
+.est-preview{max-width:100%;max-height:200px;border-radius:8px;border:1px solid var(--border2);margin-top:10px;object-fit:contain}
+.pricing-db-table{width:100%;border-collapse:collapse;font-size:0.8rem}
+.pricing-db-table th{padding:6px 10px;background:var(--surface2);border:1px solid var(--border2);font-size:0.72rem;color:var(--text-dim);text-transform:uppercase}
+.pricing-db-table td{padding:6px 10px;border:1px solid var(--border2)}
+.pricing-db-table tr:hover td{background:var(--surface2)}
+</style>
+</head>
+<body>
+
+<!-- LOGIN SCREEN -->
+<div id="login-screen" class="hidden"></div>
+
+<div id="main-wrap">
+
+<div id="app-shell" class="visible">
+
+<div class="topbar">
+  <div class="brand">
+    <button class="hamburger" id="hamburger" onclick="toggleSidebar()" aria-label="Menu">
+      <span></span><span></span><span></span>
+    </button>
+    <img src="PAH_logo_with_3D_design.png" alt="PAH" onerror="this.style.display='none'"/>
+    <div><div class="brand-name">PAH</div><div class="brand-sub">Admin Panel</div></div>
+  </div>
+  <div class="topbar-right">
+    <div class="status-pill off" id="od-pill" onclick="pillClick()">
+      <div class="dot"></div><span id="od-pill-label">OneDrive: Disconnected</span>
+    </div>
+    <div style="display:flex;align-items:center;gap:6px" title="GitHub sync token status">
+      <div id="token-indicator" class="inactive"></div>
+      <span id="token-indicator-label" style="font-size:0.7rem;color:var(--text-dim)">Token</span>
+    </div>
+    <div class="user-chip" onclick="doLogout()" title="Sign out" style="cursor:pointer">
+      <div class="user-avatar" id="user-avatar">AD</div>
+      <span id="user-name">Admin</span>
+      <span style="font-size:0.7rem;margin-left:4px;opacity:0.5">↩</span>
+    </div>
+  </div>
+</div>
+
+<div class="sidebar-overlay" id="sidebar-overlay" onclick="toggleSidebar()"></div>
+
+<div class="layout">
+  
+  <div class="sidebar" id="sidebar">
+    <div class="sidebar-section">Workspace</div>
+    <div class="nav-item active" id="nav-dashboard" onclick="goTo('dashboard')"><span class="ni">🗂</span> Dashboard</div>
+    <div class="nav-item" id="nav-projects" onclick="goTo('projects')"><span class="ni">📋</span> Projects <span class="nav-badge" id="nb-projects">0</span></div>
+    <div class="nav-item" id="nav-tasks" onclick="goTo('tasks')"><span class="ni">✅</span> Tasks <span class="nav-badge" id="nb-tasks">0</span></div>
+    <div class="nav-item" id="nav-team" onclick="goTo('team')"><span class="ni">👥</span> Team <span class="nav-badge" id="nb-team">0</span></div>
+    <div class="sidebar-divider"></div>
+    <div class="sidebar-section">Files</div>
+    <div class="nav-item" id="nav-onedrive" onclick="goTo('onedrive')"><span class="ni">☁️</span> OneDrive</div>
+    <div class="nav-item" id="nav-reports" onclick="goTo('reports')"><span class="ni">📊</span> Reports</div>
+    <div class="nav-item" id="nav-estimator" onclick="goTo('estimator')"><span class="ni">🧮</span> Estimator</div>
+    <div class="sidebar-divider"></div>
+    <div class="sidebar-section">System</div>
+    <div class="nav-item" id="nav-settings" onclick="goTo('settings')"><span class="ni">⚙️</span> Settings</div>
+    <div class="sidebar-bottom">
+      <div class="sidebar-divider"></div>
+      <div class="nav-item" onclick="pillClick()"><span class="ni">🔓</span><span id="sidebar-od-label">Connect OneDrive</span></div>
+    </div>
+  </div>
+
+<div id="notif-banner"></div>
+<div id="main-col">
+
+    <!-- DASHBOARD -->
+    <div class="page active" id="page-dashboard">
+      <div class="kpi-strip">
+        <div class="kpi b"><div class="kpi-label">Projects</div><div class="kpi-val" id="kpi-proj">0</div><div class="kpi-sub">Active</div></div>
+        <div class="kpi g"><div class="kpi-label">Tasks Done</div><div class="kpi-val" id="kpi-done">0</div><div class="kpi-sub">of <span id="kpi-total">0</span> total</div></div>
+        <div class="kpi o"><div class="kpi-label">Team Members</div><div class="kpi-val" id="kpi-team">0</div><div class="kpi-sub">Total</div></div>
+        <div class="kpi s"><div class="kpi-label">OneDrive Files</div><div class="kpi-val" id="kpi-files">–</div><div class="kpi-sub" id="kpi-files-sub">Not connected</div></div>
+      </div>
+      <!-- Universal search bar — visible on all screen sizes on dashboard -->
+      <div class="mobile-search-bar" id="home-search-bar">
+        <div style="display:flex;flex-direction:column;flex:1;gap:6px">
+          <div style="display:flex;align-items:center;gap:8px">
+            <div class="search-wrap" style="flex:1">
+              <span class="search-icon">🔍</span>
+              <input type="text" id="mobile-search" placeholder="Search everything…" oninput="mobileSearch(this.value)" autocomplete="off"/>
+            </div>
+            <button class="od-view-btn" id="home-search-clear" onclick="clearHomeSearch()" style="flex-shrink:0;display:none">✕</button>
+          </div>
+          <!-- Filter chips -->
+          <div style="display:flex;gap:6px;flex-wrap:wrap;padding-left:2px" id="search-filter-row">
+            <button class="search-chip active" data-filter="all" onclick="setSearchFilter('all')">All</button>
+            <button class="search-chip" data-filter="tasks" onclick="setSearchFilter('tasks')">✅ Tasks</button>
+            <button class="search-chip" data-filter="projects" onclick="setSearchFilter('projects')">📋 Projects</button>
+            <button class="search-chip" data-filter="team" onclick="setSearchFilter('team')">👥 Team</button>
+            <button class="search-chip" data-filter="drive" onclick="setSearchFilter('drive')">☁️ Drive</button>
+            <button class="search-chip" data-filter="folders" onclick="setSearchFilter('folders')">📁 Folders only</button>
+          </div>
+        </div>
+      </div>
+      <div id="mobile-search-results" style="display:none;flex:1;overflow-y:auto;padding:10px 16px;-webkit-overflow-scrolling:touch"></div>
+
+      <div class="dash-panels" id="dash-panels-wrap">
+        <div class="left-panel">
+          <div class="panel-head">
+            <div class="panel-head-title">✅ Tasks <span class="badge badge-blue" id="dash-task-count">0</span></div>
+            <button class="btn btn-primary btn-sm" onclick="openTaskModal()">+ Add</button>
+          </div>
+          <div class="task-list-panel" id="dash-task-list"></div>
+        </div>
+        <div class="right-panel" id="od-right">
+          <div id="s-connect" class="od-connect-screen">
+            <div class="od-connect-icon">☁️</div>
+            <h2>Connect Your OneDrive</h2>
+            <p>Sign in with your Microsoft account to browse, search, and download your real OneDrive files.</p>
+            <button class="btn-connect" onclick="msalSignIn()">
+              <div class="ms-logo"><span></span><span></span><span></span><span></span></div>
+              Sign in with Microsoft
+            </button>
+          </div>
+          <div id="s-loading" class="od-state-screen" style="display:none"><div class="spinner"></div><p id="s-loading-text">Connecting…</p></div>
+          <div id="s-error" class="od-state-screen" style="display:none">
+            <div style="font-size:2.5rem;opacity:.4">⚠️</div><p>Could not connect.</p>
+            <div class="err-detail" id="s-error-detail"></div>
+            <button class="btn-retry" onclick="msalSignIn()">Try Again</button>
+          </div>
+          <div id="s-ui" class="od-ui" style="display:none">
+            <div class="panel-head">
+              <div class="panel-head-title">☁️ OneDrive <span class="badge badge-green">● Live</span></div>
+              <button class="od-view-btn" onclick="msalSignOut()">Sign Out</button>
+            </div>
+            <div class="od-toolbar">
+              <div class="search-wrap"><span class="search-icon">🔍</span><input type="text" id="od-search" placeholder="Search OneDrive…" oninput="onSearch(this.value)"/></div>
+              <button class="od-view-btn active" id="btn-grid" onclick="setView('grid')">⊞</button>
+              <button class="od-view-btn" id="btn-list" onclick="setView('list')">☰</button>
+              <button class="od-view-btn active" id="ps-100" data-ps="100" onclick="setPageSize(100)" title="Show 100">100</button>
+              <button class="od-view-btn" id="ps-50" data-ps="50" onclick="setPageSize(50)" title="Show 50">50</button>
+              <button class="od-view-btn" id="ps-200" data-ps="200" onclick="setPageSize(200)" title="Show 200">200</button>
+              <button class="od-view-btn" id="ps-all" data-ps="all" onclick="setPageSize('all')" title="Show all">All</button>
+              <button class="od-view-btn" onclick="refreshFiles()">↻</button>
+            </div>
+            <div class="od-path" id="od-path"></div>
+            <div class="od-files" id="od-files"></div>
+            <div class="od-statusbar">
+              <div class="conn-info"><div class="dot"></div><span id="od-account-lbl">–</span></div>
+              <div class="od-pagination" id="od-pagination" style="display:none">
+                <button class="od-pg-btn" id="od-pg-prev" onclick="odChangePage(-1,false)" disabled>‹ Prev</button>
+                <span class="od-pg-info" id="od-pg-info">Page 1</span>
+                <button class="od-pg-btn" id="od-pg-next" onclick="odChangePage(1,false)">Next ›</button>
+              </div>
+              <span id="od-count-lbl">–</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- PROJECTS -->
+    <div class="page" id="page-projects">
+      <div class="page-hdr">
+        <div class="page-hdr-left"><h2>📋 Projects</h2><p>Add, edit or remove projects</p></div>
+        <button class="btn btn-primary" onclick="openProjectModal()">＋ New Project</button>
+      </div>
+      <div class="page-body">
+        <div class="page-section">
+          <div id="projects-list"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- TASKS -->
+    <div class="page" id="page-tasks">
+      <div class="page-hdr">
+        <div class="page-hdr-left"><h2>✅ Tasks</h2><p>Add, edit or remove tasks</p></div>
+        <button class="btn btn-primary" onclick="openTaskModal()">＋ New Task</button>
+      </div>
+      <div class="page-body">
+        <div class="page-section">
+          <table class="data-table">
+            <thead><tr><th>Task</th><th>Priority</th><th>Status</th><th>Due Date</th><th>Actions</th></tr></thead>
+            <tbody id="tasks-tbody"></tbody>
+          </table>
+          <div id="tasks-empty" class="empty-state" style="display:none"><span>✅</span><p>No tasks yet. Click "+ New Task" to add one.</p></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- TEAM -->
+    <div class="page" id="page-team">
+      <div class="page-hdr">
+        <div class="page-hdr-left"><h2>👥 Team</h2><p>Add, edit or remove team members</p></div>
+        <button class="btn btn-primary" onclick="openTeamModal()">＋ Add Member</button>
+      </div>
+      <div class="page-body">
+        <div class="page-section">
+          <div id="team-list"></div>
+          <div id="team-empty" class="empty-state" style="display:none"><span>👥</span><p>No team members yet. Click "+ Add Member" to add one.</p></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ONEDRIVE -->
+    <div class="page" id="page-onedrive">
+      <div class="page-hdr">
+        <div class="page-hdr-left"><h2>☁️ OneDrive</h2><p>Browse your cloud files</p></div>
+        <span class="badge badge-green" id="od-full-badge" style="display:none">● Live</span>
+      </div>
+      <div style="flex:1;display:flex;flex-direction:column;overflow:hidden">
+        <div id="sf-connect" class="od-connect-screen">
+          <div class="od-connect-icon">☁️</div><h2>Connect Your OneDrive</h2>
+          <p>Sign in with Microsoft to browse all your files.</p>
+          <button class="btn-connect" onclick="msalSignIn()"><div class="ms-logo"><span></span><span></span><span></span><span></span></div>Sign in with Microsoft</button>
+        </div>
+        <div id="sf-ui" class="od-ui" style="display:none">
+          <div class="od-toolbar">
+            <div class="search-wrap"><span class="search-icon">🔍</span><input type="text" id="sf-search" placeholder="Search OneDrive…" oninput="onSearch(this.value,true)"/></div>
+            <button class="od-view-btn active" id="sf-btn-grid" onclick="setView('grid',true)">⊞</button>
+            <button class="od-view-btn" id="sf-btn-list" onclick="setView('list',true)">☰</button>
+            <button class="od-view-btn active" id="sf-ps-100" data-ps="100" onclick="setPageSize(100,true)" title="Show 100">100</button>
+            <button class="od-view-btn" id="sf-ps-50" data-ps="50" onclick="setPageSize(50,true)" title="Show 50">50</button>
+            <button class="od-view-btn" id="sf-ps-200" data-ps="200" onclick="setPageSize(200,true)" title="Show 200">200</button>
+            <button class="od-view-btn" id="sf-ps-all" data-ps="all" onclick="setPageSize('all',true)" title="Show all">All</button>
+            <button class="od-view-btn" onclick="refreshFiles(true)">↻</button>
+            <button class="od-view-btn" onclick="msalSignOut()" style="border-color:rgba(248,81,73,0.3);color:var(--red)">Sign Out</button>
+          </div>
+          <div class="od-path" id="sf-path"></div>
+          <div class="od-files" id="sf-files"></div>
+          <div class="od-statusbar">
+            <div class="conn-info"><div class="dot"></div><span id="sf-account-lbl">–</span></div>
+            <div class="od-pagination" id="sf-pagination" style="display:none">
+              <button class="od-pg-btn" id="sf-pg-prev" onclick="odChangePage(-1,true)" disabled>‹ Prev</button>
+              <span class="od-pg-info" id="sf-pg-info">Page 1</span>
+              <button class="od-pg-btn" id="sf-pg-next" onclick="odChangePage(1,true)">Next ›</button>
+            </div>
+            <span id="sf-count-lbl">–</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- REPORTS -->
+    <div class="page" id="page-reports">
+      <div class="page-hdr"><div class="page-hdr-left"><h2>📊 Reports</h2><p>Performance overview</p></div><span class="badge badge-blue">March 2026</span></div>
+      <div class="page-body">
+        <div class="page-section"><div class="page-section-head"><h3>Tasks Completed — Last 7 Days</h3></div><div class="chart-bars" id="chart-tasks"></div></div>
+        <div class="page-section">
+          <div class="page-section-head"><h3>Project Progress</h3></div>
+          <div id="reports-projects"></div>
+        </div>
+      </div>
+    </div>
+
+
+    <!-- ESTIMATOR -->
+    <div class="page" id="page-estimator">
+      <div class="page-hdr">
+        <div class="page-hdr-left"><h2>🧮 Estimator</h2><p>AI-powered cabinet & joinery quoting</p></div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap">
+          <button class="btn btn-ghost btn-sm" onclick="clearEstimate()">🗑 Clear</button>
+          <button class="btn btn-primary btn-sm" id="est-pdf-btn" onclick="downloadEstimatePDF()" style="display:none">⬇️ Download PDF</button>
+        </div>
+      </div>
+      <div class="page-body" id="est-page-body">
+
+        <!-- client info -->
+        <div class="est-section">
+          <div class="est-section-title">Client & Project</div>
+          <div class="est-form">
+            <div><label style="font-size:0.78rem;color:var(--text-dim);display:block;margin-bottom:4px">Client Name *</label>
+              <input class="modal-input" id="est-client" placeholder="e.g. John Smith"/></div>
+            <div><label style="font-size:0.78rem;color:var(--text-dim);display:block;margin-bottom:4px">Project Address</label>
+              <input class="modal-input" id="est-address" placeholder="e.g. 12 Main St, Brisbane QLD"/></div>
+            <div><label style="font-size:0.78rem;color:var(--text-dim);display:block;margin-bottom:4px">Project Type</label>
+              <select class="modal-input" id="est-type">
+                <option>Kitchen Cabinets</option>
+                <option>Bathroom Vanity</option>
+                <option>Laundry Joinery</option>
+                <option>Wardrobe / Robe</option>
+                <option>Custom Joinery</option>
+                <option>Full Renovation</option>
+              </select></div>
+            <div><label style="font-size:0.78rem;color:var(--text-dim);display:block;margin-bottom:4px">Estimate Date</label>
+              <input class="modal-input" type="date" id="est-date"/></div>
+          </div>
+        </div>
+
+        <!-- upload zone -->
+        <div class="est-section">
+          <div class="est-section-title">Upload Plans / Scope / Image</div>
+          <div id="est-drop-zone" style="border:2px dashed var(--border);border-radius:12px;padding:30px;text-align:center;background:var(--surface);margin-bottom:4px"
+               ondragover="event.preventDefault();this.style.borderColor='var(--blue)'"
+               ondragleave="this.style.borderColor='var(--border)'"
+               ondrop="handleEstDrop(event)">
+            <div style="font-size:2.2rem;margin-bottom:8px">📄</div>
+            <div id="est-upload-text" style="font-size:0.85rem;color:var(--text-dim);margin-bottom:14px">
+              <strong style="color:var(--text)">Select a file below</strong><br>
+              PDF, JPG, PNG, HEIC — floor plans, sketches, scope documents
+            </div>
+            <input type="file" id="est-file-input"
+              accept=".pdf,.PDF,image/*,.heic,.heif,application/pdf"
+              style="display:block;width:100%;padding:8px;background:var(--surface2);border:1px solid var(--border);border-radius:8px;color:var(--text);font-size:0.85rem;cursor:pointer"
+              onchange="handleEstFile(this.files[0])"/>
+            <img id="est-preview" class="est-preview" style="display:none;margin-top:12px;max-height:160px;border-radius:8px"/>
+          </div>
+          <div style="margin-top:10px;display:flex;gap:10px;flex-wrap:wrap;align-items:center">
+            <div style="flex:1;min-width:200px">
+              <label style="font-size:0.78rem;color:var(--text-dim);display:block;margin-bottom:4px">Extra notes for AI (optional)</label>
+              <input class="modal-input" id="est-notes-input" placeholder="e.g. Client wants soft-close hinges, stone benchtop, 2700mm ceiling height"/>
+            </div>
+            <button class="btn btn-primary" onclick="runEstimator()" id="est-run-btn" style="align-self:flex-end">🤖 Generate Estimate</button>
+          </div>
+        </div>
+
+        <!-- AI status -->
+        <div class="est-ai-status" id="est-status" style="display:none">
+          <div class="est-spinner"></div>
+          <span id="est-status-text">Analysing document…</span>
+        </div>
+
+        <!-- result -->
+        <div id="est-result" style="display:none">
+          <div class="est-section">
+            <div class="est-section-title">Scope of Work</div>
+            <div id="est-scope-text" style="font-size:0.84rem;line-height:1.7;color:var(--text-dim);background:var(--surface);border-radius:8px;padding:14px 16px;border:1px solid var(--border2)"></div>
+          </div>
+          <div class="est-section">
+            <div class="est-section-title">Materials</div>
+            <div style="overflow-x:auto">
+              <table class="est-table" id="est-materials-table">
+                <thead><tr><th>Item</th><th>SKU</th><th>Qty</th><th>Unit</th><th>Unit Price</th><th>Total</th></tr></thead>
+                <tbody id="est-materials-body"></tbody>
+              </table>
+            </div>
+          </div>
+          <div class="est-section">
+            <div class="est-section-title">Labour</div>
+            <div style="overflow-x:auto">
+              <table class="est-table" id="est-labour-table">
+                <thead><tr><th>Task</th><th>Hours</th><th>Rate (AUD/hr)</th><th>Total</th></tr></thead>
+                <tbody id="est-labour-body"></tbody>
+              </table>
+            </div>
+          </div>
+          <div class="est-grand-total">
+            <div>
+              <div class="est-grand-total-label">Total Estimate (incl. margin)</div>
+              <div style="font-size:0.72rem;color:var(--text-dim);margin-top:2px">Materials + Labour + <span id="est-margin-label">margin</span></div>
+            </div>
+            <div class="est-grand-total-val" id="est-total">AUD $0.00</div>
+          </div>
+        </div>
+
+      </div>
+    </div>
+    <!-- SETTINGS -->
+    <div class="page" id="page-settings">
+      <div class="page-hdr"><div class="page-hdr-left"><h2>⚙️ Settings</h2><p>Configure your preferences</p></div></div>
+      <div class="page-body">
+        <div class="page-section"><div class="page-section-head"><h3>Profile</h3></div>
+          <div class="settings-group">
+            <label>Username</label>
+            <input class="modal-input" type="text" id="set-name" readonly style="opacity:0.6;cursor:default"/>
+            <label>Role</label>
+            <input class="modal-input" type="text" id="set-role" readonly style="opacity:0.6;cursor:default"/>
+            <label>Display Name</label>
+            <input class="modal-input" type="text" id="set-displayname" placeholder="Your display name"/>
+            <label>Email <span style="font-size:0.75rem;color:var(--text-dim)">(used for notifications)</span></label>
+            <input class="modal-input" type="email" id="set-email" placeholder="your@email.com"/>
+            <button class="btn btn-primary" style="margin-top:14px" onclick="saveProfileSettings()">Save Changes</button>
+            <div style="margin-top:20px;padding-top:16px;border-top:1px solid var(--border2)">
+              <label style="display:block;margin-bottom:6px">Change Password</label>
+              <div style="display:flex;gap:10px;align-items:center;margin-bottom:8px">
+                <input class="modal-input" type="password" id="set-password" placeholder="New password (min 6 chars)…" style="flex:1"/>
+                <button class="btn btn-ghost btn-sm" type="button" onclick="toggleSettingPassword(this)" style="white-space:nowrap">Show</button>
+              </div>
+              <input class="modal-input" type="password" id="set-password-confirm" placeholder="Confirm new password…"/>
+            </div>
+            <button class="btn btn-primary" style="margin-top:10px" onclick="changeMyPassword()">💾 Change Password</button>
+          </div>
+        </div>
+        <div class="page-section" id="settings-preferences"><div class="page-section-head"><h3>Preferences</h3></div>
+          <div class="settings-group">
+            <div class="settings-toggle"><div><div class="toggle-label">OneDrive Auto-connect</div><div class="toggle-desc">Reconnect automatically on load</div></div><div class="toggle-sw on" onclick="this.classList.toggle('on')"></div></div>
+            <div class="settings-toggle"><div><div class="toggle-label">Browser / PWA Push</div><div class="toggle-desc">In-browser alerts for task deadlines</div></div><div class="toggle-sw on" id="toggle-browser-notif" onclick="toggleNotifPref('browser',this)"></div></div>
+            <div class="settings-toggle"><div><div class="toggle-label">In-App Reminder Banner</div><div class="toggle-desc">Floating alert card inside the app</div></div><div class="toggle-sw on" id="toggle-banner-notif" onclick="toggleNotifPref('banner',this)"></div></div>
+            <div class="settings-toggle"><div><div class="toggle-label">Email Alerts</div><div class="toggle-desc">Send email when tasks are due</div></div><div class="toggle-sw" id="toggle-email-notif" onclick="toggleNotifPref('email',this)"></div></div>
+            <div class="settings-toggle"><div><div class="toggle-label">SMS (via Email-to-SMS)</div><div class="toggle-desc">Works with carrier email gateway</div></div><div class="toggle-sw" id="toggle-sms-notif" onclick="toggleNotifPref('sms',this)"></div></div>
+          </div>
+        </div>
+        <div class="page-section" id="emailjs-config-section">
+          <div class="page-section-head"><h3>📧 Email / SMS Notifications</h3></div>
+          <div class="settings-group">
+            <p style="font-size:0.78rem;color:var(--text-dim);margin-bottom:12px;line-height:1.6">
+              Uses <strong style="color:var(--text)">EmailJS</strong> (free). 
+              <a href="https://emailjs.com" target="_blank" style="color:var(--blue)">Sign up</a> → 
+              Add email service → Create template using these variables:<br>
+              <code style="background:var(--surface2);padding:1px 5px;border-radius:4px">{{task_name}}</code> — item name &nbsp;
+              <code style="background:var(--surface2);padding:1px 5px;border-radius:4px">{{item_type}}</code> — Task or Project &nbsp;
+              <code style="background:var(--surface2);padding:1px 5px;border-radius:4px">{{due_date}}</code> — due date &nbsp;
+              <code style="background:var(--surface2);padding:1px 5px;border-radius:4px">{{to_email}}</code> — recipient
+            </p>
+            <label>EmailJS Public Key</label>
+            <input class="modal-input" id="ejs-pubkey" placeholder="e.g. user_xxxxxxxxxxxxxxxx" style="margin-bottom:10px"/>
+            <label>EmailJS Service ID</label>
+            <input class="modal-input" id="ejs-service" placeholder="e.g. service_xxxxxxx" style="margin-bottom:10px"/>
+            <label>EmailJS Template ID</label>
+            <input class="modal-input" id="ejs-template" placeholder="e.g. template_xxxxxxx" style="margin-bottom:10px"/>
+            <label>Alert Recipient Email <span style="color:var(--text-dim);font-size:0.75rem">(passed as {{to_email}} in your EmailJS template)</span></label>
+            <input class="modal-input" id="ejs-email" type="email" placeholder="you@example.com" style="margin-bottom:10px"/>
+            <label>SMS Email Gateway <span style="color:var(--text-dim);font-size:0.75rem">(optional — e.g. <a href="/cdn-cgi/l/email-protection" class="__cf_email__" data-cfemail="477773767574737271707f07342a346933222b343335266924282a">[email&#160;protected]</a>)</span></label>
+            <input class="modal-input" id="ejs-sms" placeholder="number@carrier-gateway.com" style="margin-bottom:14px"/>
+            <div style="background:var(--surface);border:1px solid var(--border2);border-radius:8px;padding:10px 14px;font-size:0.75rem;color:var(--text-dim);margin-bottom:14px;line-height:1.7">
+              <strong style="color:var(--text)">Common AU SMS gateways:</strong><br>
+              Telstra: <code><a href="/cdn-cgi/l/email-protection" class="__cf_email__" data-cfemail="d7b9a2bab5b2a597a4baa4f9a3b2bba4a3a5b6f9b4b8ba">[email&#160;protected]</a></code><br>
+              Optus: <code><a href="/cdn-cgi/l/email-protection" class="__cf_email__" data-cfemail="7719021a1512053718070302041a18151e1b12121a161e1b5914181a591602">[email&#160;protected]</a></code><br>
+              Vodafone: <code><a href="/cdn-cgi/l/email-protection" class="__cf_email__" data-cfemail="a1cfd4ccc3c4d3e1d7cec5c08fcfc4d58fc0d4">[email&#160;protected]</a></code>
+            </div>
+            <div style="display:flex;gap:10px;flex-wrap:wrap">
+              <button class="btn btn-primary" onclick="saveNotifConfig()">💾 Save Config</button>
+              <button class="btn btn-ghost" onclick="testNotification()">🧪 Send Test</button>
+            </div>
+            <div id="ejs-status" style="margin-top:10px;font-size:0.78rem;display:none"></div>
+          </div>
+        </div>
+
+        <div class="page-section" id="settings-reminders">
+          <div class="page-section-head"><h3>⏰ Reminder Schedule</h3></div>
+          <div class="settings-group">
+            <p style="font-size:0.78rem;color:var(--text-dim);margin-bottom:12px">Choose when to receive reminders before a task is due:</p>
+            <div id="reminder-schedule-list"></div>
+            <button class="btn btn-ghost btn-sm" onclick="addReminderInterval()" style="margin-top:10px">＋ Add Interval</button>
+          </div>
+        </div>
+
+        <div class="page-section" id="settings-onedrive"><div class="page-section-head"><h3>OneDrive</h3></div>
+          <div class="settings-group">
+            <label>Connection Status</label>
+            <div style="display:flex;align-items:center;gap:10px;margin-top:6px">
+              <div class="status-pill off" id="set-od-pill" style="cursor:default;font-size:0.78rem"><div class="dot"></div><span id="set-od-status">Disconnected</span></div>
+              <button class="btn btn-ghost btn-sm" onclick="pillClick()">Manage</button>
+            </div>
+          </div>
+        </div>
+        <div class="page-section" id="settings-task-statuses">
+          <div class="page-section-head"><h3>Task Statuses</h3><button class="btn btn-primary btn-sm" onclick="addTaskStatus()">＋ Add Status</button></div>
+          <div class="settings-group" id="task-status-list" style="padding:10px"></div>
+        </div>
+
+        <div class="page-section" id="user-accounts-section">
+          <div class="page-section-head"><h3>User Accounts</h3><button id="add-user-btn" class="btn btn-primary btn-sm" onclick="openAddUserModal()">＋ Add User</button></div>
+          <div class="settings-group" id="users-list" style="padding:10px"></div>
+        </div>
+
+        <div class="page-section" id="settings-pricing">
+          <div class="page-section-head"><h3>🧮 Pricing Database</h3>
+            <div style="display:flex;gap:8px">
+              <button class="btn btn-ghost btn-sm" onclick="loadPricingFromOneDrive()">☁️ Load from OneDrive</button>
+              <button class="btn btn-primary btn-sm" onclick="savePricingDB()">💾 Save</button>
+            </div>
+          </div>
+          <div class="settings-group">
+            <p style="font-size:0.78rem;color:var(--text-dim);margin-bottom:12px;line-height:1.6">
+              Paste your pricing data as CSV below, or load directly from an Excel/CSV file in OneDrive.
+              Format: <code style="background:var(--surface2);padding:1px 5px;border-radius:4px">SKU, Description, Unit, BulkPrice, LabourHours, InstallCost, Margin%</code>
+            </p>
+            <div style="display:flex;gap:10px;margin-bottom:10px;flex-wrap:wrap">
+              <div style="flex:1;min-width:140px">
+                <label style="font-size:0.75rem;color:var(--text-dim);display:block;margin-bottom:4px">Default Margin %</label>
+                <input class="modal-input" type="number" id="pricing-margin" placeholder="e.g. 30" min="0" max="100"/>
+              </div>
+              <div style="flex:1;min-width:140px">
+                <label style="font-size:0.75rem;color:var(--text-dim);display:block;margin-bottom:4px">Default Labour Rate (AUD/hr)</label>
+                <input class="modal-input" type="number" id="pricing-labour-rate" placeholder="e.g. 85" min="0"/>
+              </div>
+              <div style="flex:1;min-width:200px">
+                <label style="font-size:0.75rem;color:var(--text-dim);display:block;margin-bottom:4px">OneDrive File Path (optional)</label>
+                <input class="modal-input" id="pricing-od-path" placeholder="e.g. /Documents/pricing.xlsx"/>
+              </div>
+            </div>
+            <label style="font-size:0.75rem;color:var(--text-dim);display:block;margin-bottom:6px">Pricing CSV Data</label>
+            <textarea id="pricing-csv" class="modal-input" rows="8" placeholder="SKU,Description,Unit,BulkPrice,LabourHours,InstallCost,Margin&#10;CAB-001,Base Cabinet 600mm,each,280,1.5,45,30&#10;CAB-002,Wall Cabinet 600mm,each,195,1.0,35,30&#10;HINGE-SC,Soft Close Hinge,pair,12,0.1,0,30&#10;BENCH-LAM,Laminate Benchtop per LM,lm,95,0.5,20,30" style="font-family:monospace;font-size:0.78rem;resize:vertical"></textarea>
+            <div id="pricing-db-preview" style="margin-top:12px;display:none">
+              <div style="font-size:0.75rem;color:var(--text-dim);margin-bottom:8px">Preview (<span id="pricing-row-count">0</span> items loaded)</div>
+              <div style="overflow-x:auto;max-height:200px;overflow-y:auto">
+                <table class="pricing-db-table" id="pricing-preview-table">
+                  <thead><tr><th>SKU</th><th>Description</th><th>Unit</th><th>Bulk Price</th><th>Labour Hrs</th><th>Install</th><th>Margin%</th></tr></thead>
+                  <tbody id="pricing-preview-body"></tbody>
+                </table>
+              </div>
+            </div>
+            <div id="pricing-status" style="margin-top:10px;font-size:0.78rem;display:none"></div>
+          </div>
+        </div>
+
+        <div class="page-section" id="settings-github"><div class="page-section-head"><h3>GitHub Sync</h3></div>
+          <div class="settings-group">
+            <label>Personal Access Token</label>
+            <div style="display:flex;align-items:center;gap:10px;margin-top:6px;flex-wrap:wrap">
+              <span id="gh-token-status">Not set</span>
+              <span id="gh-admin-btns">
+                <button class="btn btn-primary btn-sm" onclick="document.getElementById('pw-modal').classList.add('open');document.getElementById('pw-input').value='';setTimeout(()=>document.getElementById('pw-input').focus(),100)">🔑 Enter Password</button>
+                <button class="btn btn-danger btn-sm" onclick="clearGhToken()">Clear</button>
+              </span>
+            </div>
+            <p id="gh-token-desc" style="font-size:0.72rem;color:var(--text-dim);margin-top:10px;line-height:1.6">Your token is <strong style="color:var(--text)">encrypted with AES-256</strong> and embedded in the file. Enter your password once per browser session to unlock GitHub sync. The raw token is never visible in the source code.</p>
+          </div>
+        </div>
+      </div>
+    </div>
+
+</div><!-- /main-col -->
+</div><!-- /layout -->
+
+<!-- TASK MODAL -->
+<div class="modal-overlay" id="task-modal">
+  <div class="modal">
+    <div class="modal-title"><span id="task-modal-icon">✅</span><span id="task-modal-title">New Task</span></div>
+    <input type="hidden" id="task-edit-id"/>
+    <input type="hidden" id="task-od-folder-id"/>
+    <div class="modal-field"><label>Task Name *</label><input class="modal-input" id="task-name" placeholder="Enter task name…"/></div>
+    <div class="modal-field"><label>Priority</label>
+      <select class="modal-input" id="task-pri">
+        <option value="h">High</option><option value="m" selected>Medium</option><option value="l">Low</option>
+      </select>
+    </div>
+    <div class="modal-field"><label>Due Date</label><input class="modal-input" type="date" id="task-due"/></div>
+    <div class="modal-field"><label>Status</label>
+      <select class="modal-input" id="task-status"></select>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-ghost" onclick="closeModal('task-modal')">Cancel</button>
+      <button class="btn btn-primary" onclick="saveTask()">Save Task</button>
+    </div>
+  </div>
+</div>
+
+<!-- PROJECT MODAL -->
+<div class="modal-overlay" id="project-modal">
+  <div class="modal">
+    <div class="modal-title"><span id="proj-modal-icon">📋</span><span id="proj-modal-title">New Project</span></div>
+    <input type="hidden" id="proj-edit-id"/>
+    <input type="hidden" id="proj-od-folder-id"/>
+    <div class="modal-field"><label>Project Name *</label><input class="modal-input" id="proj-name" placeholder="Enter project name…"/></div>
+    <div class="modal-field"><label>Description</label><input class="modal-input" id="proj-desc" placeholder="Short description…"/></div>
+    <div class="modal-field"><label>Progress (0–100)</label><input class="modal-input" type="number" id="proj-progress" min="0" max="100" value="0"/></div>
+    <div class="modal-field"><label>Status</label>
+      <select class="modal-input" id="proj-status">
+        <option value="on-track">On Track</option><option value="at-risk">At Risk</option>
+        <option value="in-progress">In Progress</option><option value="overdue">Overdue</option><option value="done">Done</option>
+      </select>
+    </div>
+    <div class="modal-field"><label>Due Date</label><input class="modal-input" type="date" id="proj-due"/></div>
+    <div class="modal-footer">
+      <button class="btn btn-ghost" onclick="closeModal('project-modal')">Cancel</button>
+      <button class="btn btn-primary" onclick="saveProject()">Save Project</button>
+    </div>
+  </div>
+</div>
+
+<!-- TEAM MODAL -->
+<div class="modal-overlay" id="team-modal">
+  <div class="modal">
+    <div class="modal-title"><span id="team-modal-icon">👤</span><span id="team-modal-title">Add Member</span></div>
+    <input type="hidden" id="team-edit-id"/>
+    <div class="modal-field"><label>Full Name *</label><input class="modal-input" id="team-name" placeholder="First Last…"/></div>
+    <div class="modal-field"><label>Role / Title</label><input class="modal-input" id="team-role" placeholder="e.g. Developer, Designer…"/></div>
+    <div class="modal-field"><label>Status</label>
+      <select class="modal-input" id="team-status">
+        <option value="online">Online</option><option value="away">Away</option><option value="offline">Offline</option>
+      </select>
+    </div>
+    <div class="modal-field"><label>Phone Number</label><input class="modal-input" type="tel" id="team-phone" placeholder="+61 4xx xxx xxx"/></div>
+    <div class="modal-field"><label>Avatar Colour</label>
+      <select class="modal-input" id="team-color">
+        <option value="#1565c0">Blue</option><option value="#2e7d32">Green</option><option value="#e65100">Orange</option>
+        <option value="#6a1b9a">Purple</option><option value="#c62828">Red</option><option value="#00838f">Teal</option><option value="#455a64">Slate</option>
+      </select>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-ghost" onclick="closeModal('team-modal')">Cancel</button>
+      <button class="btn btn-primary" onclick="saveMember()">Save Member</button>
+    </div>
+  </div>
+</div>
+
+<!-- PASSWORD UNLOCK MODAL -->
+<div class="modal-overlay" id="pw-modal">
+  <div class="modal" style="max-width:380px;text-align:center">
+    <div style="font-size:2rem;margin-bottom:8px">🔑</div>
+    <div class="modal-title" style="justify-content:center;margin-bottom:6px">GitHub Sync</div>
+    <p style="font-size:0.8rem;color:var(--text-dim);margin-bottom:20px;line-height:1.6">Enter your password to enable saving to GitHub.<br>You only need this once per browser session.</p>
+    <div class="modal-field">
+      <input class="modal-input" type="password" id="pw-input" placeholder="Enter password…" onkeydown="if(event.key==='Enter')submitPassword()"/>
+    </div>
+    <div id="pw-error" style="display:none;color:var(--red);font-size:0.78rem;margin-top:8px;padding:7px 12px;background:rgba(248,81,73,0.08);border-radius:6px;border:1px solid rgba(248,81,73,0.2)"></div>
+    <div class="modal-footer" style="justify-content:center;margin-top:18px">
+      <button class="btn btn-ghost" onclick="cancelPassword()">Skip</button>
+      <button class="btn btn-primary" id="pw-btn" onclick="submitPassword()">🔓 Unlock</button>
+    </div>
+  </div>
+</div>
+
+<!-- STAR CHOICE MODAL -->
+<div class="modal-overlay" id="star-choice-modal">
+  <div class="modal" style="max-width:380px;text-align:center">
+    <div style="font-size:2rem;margin-bottom:6px">⭐</div>
+    <div class="modal-title" style="justify-content:center">Link Folder</div>
+    <p style="font-size:0.82rem;color:var(--text-dim);margin-bottom:6px">Add <strong id="star-modal-folder" style="color:var(--text)"></strong> as:</p>
+    <input type="hidden" id="star-folder-id"/>
+    <input type="hidden" id="star-folder-name"/>
+    <div style="display:flex;flex-direction:column;gap:10px;margin-top:16px">
+      <button class="btn btn-primary" style="justify-content:center" onclick="starAsProject()">📋 Project only</button>
+      <button class="btn btn-primary" style="justify-content:center" onclick="starAsTask()">✅ Task only</button>
+      <button class="btn btn-primary" style="justify-content:center;background:rgba(240,192,96,0.15);border-color:var(--gold);color:var(--gold)" onclick="starAsBoth()">⭐ Both Project & Task</button>
+    </div>
+    <div class="modal-footer" style="justify-content:center;margin-top:14px">
+      <button class="btn btn-ghost" onclick="closeModal('star-choice-modal')">Cancel</button>
+    </div>
+  </div>
+</div>
+
+<!-- CONFIRM DELETE -->
+<div class="modal-overlay" id="confirm-modal">
+  <div class="modal confirm-modal">
+    <div class="confirm-icon">🗑️</div>
+    <p>Delete <span class="confirm-name" id="confirm-name"></span>?</p>
+    <p style="font-size:0.78rem;margin-top:4px">This cannot be undone.</p>
+    <div class="modal-footer" style="justify-content:center">
+      <button class="btn btn-ghost" onclick="closeModal('confirm-modal')">Cancel</button>
+      <button class="btn btn-danger" id="confirm-yes">Delete</button>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script data-cfasync="false" src="/cdn-cgi/scripts/5c5dd728/cloudflare-static/email-decode.min.js"></script>
+<script>
+
+
+// Users stored in data.json on GitHub. Default admin always exists.
+// Passwords stored as SHA-256 hashes.
+
+async function sha256(str){
+  const buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(str));
+  return Array.from(new Uint8Array(buf)).map(b=>b.toString(16).padStart(2,'0')).join('');
+}
+
+// Default admin user (VIP-Cabinets / Admin_vipcabinets) — hash computed at runtime
+let USERS = [];
+let currentUser = null;
+
+async function initDefaultUsers(){
+  const hash = await sha256('Admin_vipcabinets');
+  const existing = USERS.find(u=>u.username==='VIP-Cabinets');
+  if(!existing){
+    // not in array at all — add it
+    USERS.unshift({username:'VIP-Cabinets', passwordHash:hash, role:'admin', builtIn:true});
+  } else {
+    // always mark as builtIn and admin
+    existing.builtIn = true;
+    existing.role = existing.role || 'admin';
+    // only reset hash if it's a placeholder
+    if(existing.passwordHash==='__INIT__' || !existing.passwordHash){
+      existing.passwordHash = hash;
+    }
+  }
+}
+
+async function doLogin(){
+  const username = document.getElementById('login-user').value.trim();
+  const password = document.getElementById('login-pass').value;
+  const remember = document.getElementById('login-remember').checked;
+  const errEl = document.getElementById('login-error');
+  const btn = document.getElementById('login-submit');
+
+  errEl.style.display='none';
+  if(!username||!password){ showLoginError('Please enter username and password.'); return; }
+
+  btn.textContent='Signing in…'; btn.disabled=true;
+
+
+
+
+  // ensure built-in user always exists before checking
+  await initDefaultUsers();
+  const hash = await sha256(password);
+  const allUsers = USERS;
+  console.log('Login attempt:', username, '| USERS count:', USERS.length, '| Users:', USERS.map(u=>u.username));
+  const user = allUsers.find(u => u.username.toLowerCase()===username.toLowerCase() && u.passwordHash===hash);
+  console.log('User found:', user ? user.username : 'NONE');
+
+  btn.textContent='SIGN IN'; btn.disabled=false;
+
+  if(!user){ showLoginError('❌ Incorrect username or password.'); return; }
+
+  currentUser = user;
+  if(remember){
+    localStorage.setItem('pah_session', JSON.stringify({username:user.username, role:user.role, ts:Date.now()}));
+  } else {
+    sessionStorage.setItem('pah_session', JSON.stringify({username:user.username, role:user.role, ts:Date.now()}));
+  }
+
+  // Decrypt GitHub token and store in session (one login unlocks everything)
+  const ghToken = await decryptToken('Admin_vipcabinets');
+  if(ghToken) sessionStorage.setItem('pah_gh_token', ghToken);
+  // pre-cache anthropic key too
+  getAnthropicKey();
+
+  showApp(user);
+  updateGhTokenUI();
+}
+
+function showLoginError(msg){
+  const el=document.getElementById('login-error');
+  el.textContent=msg; el.style.display='block';
+}
+
+function showApp(user){
+  document.getElementById('login-screen').classList.add('hidden');
+  document.getElementById('app-shell').classList.add('visible');
+  const ini = user.username.slice(0,2).toUpperCase();
+  document.getElementById('user-avatar').textContent=ini;
+  document.getElementById('user-name').textContent=user.username;
+  // updateGhTokenUI removed
+}
+
+function doLogout(){
+  if(!confirm('Sign out of PAH Admin?')) return;
+  currentUser=null;
+  localStorage.removeItem('pah_session');
+  sessionStorage.removeItem('pah_session');
+  sessionStorage.removeItem('pah_gh_token');
+  window._ghSha=null;
+  document.getElementById('app-shell').classList.remove('visible');
+  document.getElementById('login-screen').classList.remove('hidden');
+  document.getElementById('login-user').value='';
+  document.getElementById('login-pass').value='';
+  document.getElementById('login-error').style.display='none';
+  toast('Signed out');
+}
+
+function checkExistingSession(){
+  const raw = localStorage.getItem('pah_session') || sessionStorage.getItem('pah_session');
+  if(!raw) return false;
+  try{
+    const s = JSON.parse(raw);
+    // Session valid for 30 days if remember, else session storage handles it
+    if(Date.now() - s.ts > 30*24*60*60*1000){ localStorage.removeItem('pah_session'); return false; }
+    currentUser = {username:s.username, role:s.role};
+    showApp(currentUser);
+    // auto-decrypt token for this session
+    decryptToken('Admin_vipcabinets').then(t=>{
+      if(t){ sessionStorage.setItem('pah_gh_token',t); }
+      updateGhTokenUI();
+    });
+    return true;
+  }catch(e){ return false; }
+}
+
+async function loadUsersFromGitHub(){
+  try{
+    const tok=sessionStorage.getItem('pah_gh_token');
+    if(!tok) return;
+    const url=`https://api.github.com/repos/${GH.owner}/${GH.repo}/contents/${GH.file}`;
+    const r=await fetch(url,{headers:{Authorization:`token ${tok}`,Accept:'application/vnd.github.v3+json'}});
+    if(!r.ok) return;
+    const j=await r.json();
+    const decoded=JSON.parse(atob(j.content.split('\n').join('')));
+    if(decoded.users && decoded.users.length > 0) USERS=decoded.users;
+    window._ghSha=j.sha;
+  }catch(e){ console.warn('loadUsers error',e.message); }
+  // always ensure built-in admin exists after any user load
+  await initDefaultUsers();
+}
+
+function renderUsersList(){
+  const el=document.getElementById('users-list');
+  if(!el) return;
+  const role=currentUser?.role||'viewer';
+  const isAdmin=role==='admin';
+  const isManager=role==='manager';
+  const isViewer=role==='viewer';
+
+  const addBtn=document.getElementById('add-user-btn');
+  if(addBtn){ addBtn.style.display = (isAdmin || isManager) ? 'inline-flex' : 'none'; }
+
+  const allUsers=USERS;
+  el.innerHTML=allUsers.map((u,i)=>{
+    const isSelf = currentUser && u.username===currentUser.username;
+    const canEdit = isAdmin || isManager || (isViewer && isSelf);
+    const canDelete = isAdmin;
+    const index = u.builtIn ? -1 : i;
+
+    // Only show edit for viewers on their own account, managers/admins can edit any
+    const showEdit = (isAdmin || isManager) || (isViewer && isSelf);
+    const editBtn = showEdit
+      ? `<button class="btn btn-ghost btn-sm" onclick="openEditUserModal(${index})">✏️</button>`
+      : '';
+
+    const deleteBtn = (!u.builtIn && canDelete)
+      ? `<button class="btn btn-danger btn-sm" onclick="deleteUser(${index},'${u.username}')">🗑️</button>`
+      : '';
+    const actions = editBtn || deleteBtn ? `${editBtn}${deleteBtn}` : '<span style="font-size:0.7rem;color:var(--text-dim);padding:4px 8px">—</span>';
+
+    return `
+      <div style="display:flex;align-items:center;gap:12px;padding:10px 6px;border-bottom:1px solid var(--border2)">
+        <div style="width:32px;height:32px;border-radius:50%;background:linear-gradient(135deg,#1565c0,var(--blue));display:grid;place-items:center;font-size:0.75rem;font-weight:700;color:#fff;flex-shrink:0">${u.username.slice(0,2).toUpperCase()}</div>
+        <div style="flex:1">
+          <div style="font-size:0.85rem;font-weight:600">${u.username}</div>
+          <div style="font-size:0.7rem;color:var(--text-dim)">${u.role}${u.builtIn?' · built-in':''}</div>
+        </div>
+        ${actions}
+      </div>`;
+  }).join('');
+}
+
+function openAddUserModal(){
+  const isAdmin = (currentUser?.role||'').toLowerCase() === 'admin';
+  const roleSelect = document.getElementById('new-user-role');
+  if(roleSelect){
+    roleSelect.innerHTML = isAdmin
+      ? '<option value="admin">Admin</option><option value="manager">Manager</option><option value="viewer">Viewer</option>'
+      : '<option value="manager">Manager</option><option value="viewer">Viewer</option>';
+  }
+  const canAdd = isAdmin || (currentUser?.role||'').toLowerCase() === 'manager';
+  if(!canAdd){ toast('⚠️ Only admins and managers can add users'); return; }
+  document.getElementById('user-modal-title').textContent='Add User';
+  document.getElementById('user-modal-icon').textContent='👤';
+  document.getElementById('user-edit-idx').value='';
+  document.getElementById('new-user-name').value='';
+  document.getElementById('new-user-pass').value='';
+  document.getElementById('new-user-role').value='viewer';
+  openModal('add-user-modal');
+}
+
+function openEditUserModal(idx){
+  const isBuiltIn = idx < 0;
+  const u = isBuiltIn ? USERS.find(u=>u.builtIn) : USERS[idx];
+  const role=(currentUser?.role||'').toString().toLowerCase();
+  const isAdmin=role==='admin';
+  const isManager=role==='manager';
+  const isViewer=role==='viewer';
+  const isSelf=currentUser?.username===u.username;
+
+  // Only admin/manager can edit other users; viewer can only edit their own password.
+  if(isViewer && !isSelf){
+    toast('⚠️ Viewers cannot edit other users');
+    return;
+  }
+  if(!isAdmin && !isManager && !isSelf){
+    toast('⚠️ You do not have permission to edit this user');
+    return;
+  }
+
+  document.getElementById('user-modal-title').textContent='Edit User';
+  document.getElementById('user-modal-icon').textContent='✏️';
+  document.getElementById('user-edit-idx').value=idx;
+  document.getElementById('new-user-name').value=u.username;
+  document.getElementById('new-user-pass').value='';
+  document.getElementById('new-user-role').value=u.role;
+
+  const nameEl=document.getElementById('new-user-name');
+  const roleEl=document.getElementById('new-user-role');
+
+  // Only admins can change username or role.
+  nameEl.disabled = !isAdmin;
+  roleEl.disabled = !isAdmin;
+
+  // Built-in user must not be editable except by admin.
+  if(isBuiltIn && !isAdmin){
+    nameEl.disabled = true;
+    roleEl.disabled = true;
+  }
+
+  // Managers cannot edit Admin accounts (including password) to prevent privilege escalation.
+  if(isManager && u.role==='admin'){
+    toast('⚠️ Managers cannot modify admin accounts');
+    return;
+  }
+
+  openModal('add-user-modal');
+}
+
+async function saveUser(){
+  const username=document.getElementById('new-user-name').value.trim();
+  const password=document.getElementById('new-user-pass').value;
+  const role=document.getElementById('new-user-role').value;
+  const idxRaw=document.getElementById('user-edit-idx').value;
+  const isEdit = idxRaw!=='';
+  const idx=parseInt(idxRaw,10);
+  const isBuiltIn = isEdit && idx<0;
+  const currentRole=(currentUser?.role||'').toString().toLowerCase();
+  const isAdmin = currentRole==='admin';
+  const isManager = currentRole==='manager';
+  const isViewer = currentRole==='viewer';
+
+  if(!username){ toast('⚠️ Username required'); return; }
+  const canAdd = isAdmin || isManager;
+  if(!isEdit && !canAdd){ toast('⚠️ Only admins and managers can add users'); return; }
+  // managers can only assign manager or viewer roles
+  if(!isAdmin && isManager){
+    const chosenRole = (document.getElementById('new-user-role')?.value||'').toLowerCase();
+    if(chosenRole === 'admin'){ toast('⚠️ Managers cannot create admin accounts'); return; }
+  }
+  if(!isEdit && !password){ toast('⚠️ Password required'); return; }
+  if(password && password.length<6){ toast('⚠️ Password must be 6+ characters'); return; }
+
+  const allNames=USERS;
+  if(!isEdit && allNames.find(u=>u.username.toLowerCase()===username.toLowerCase())){ toast('⚠️ Username already exists'); return; }
+
+  if(isEdit){
+    const u = isBuiltIn ? USERS.find(u=>u.builtIn) : USERS[idx];
+    const isSelf = currentUser?.username===u.username;
+    if(isViewer && !isSelf){ toast('⚠️ You cannot edit other accounts'); return; }
+    if(!isAdmin && !isManager && !isSelf){ toast('⚠️ You cannot edit other accounts'); return; }
+
+    // Managers cannot change admin accounts (even password).
+    const targetRole=(u.role||'').toString().toLowerCase();
+    if(isManager && targetRole==='admin'){ toast('⚠️ Managers cannot modify admin accounts'); return; }
+
+    // Managers can only reset passwords; viewers can only reset their own password.
+    if(isAdmin){
+      u.username=username; u.role=role;
+    }
+    if(password){ u.passwordHash=await sha256(password); }
+    toast('✅ User updated');
+  } else {
+    USERS.push({username, passwordHash:await sha256(password), role});
+    toast('✅ User added');
+  }
+
+  if(!isBuiltIn) await saveUsersToGitHub();
+  renderUsersList();
+  closeModal('add-user-modal');
+}
+
+async function deleteUser(idx, name){
+  const role=(currentUser?.role||'').toString().toLowerCase();
+  if(role!=='admin'){ toast('⚠️ Only admins can delete users'); return; }
+  if(!confirm('Delete user "'+name+'"?')) return;
+  USERS.splice(idx,1);
+  await saveUsersToGitHub();
+  renderUsersList();
+  toast('🗑️ User deleted');
+}
+
+async function saveUsersToGitHub(){
+  const tok=await getOrAskToken();
+  if(!tok) return;
+  try{
+    const url=`https://api.github.com/repos/${GH.owner}/${GH.repo}/contents/${GH.file}`;
+    const check=await fetch(url,{headers:{Authorization:`token ${tok}`,Accept:'application/vnd.github.v3+json'}});
+    if(check.ok){ const cj=await check.json(); window._ghSha=cj.sha; }
+    else { window._ghSha=null; }
+    const payload={tasks:TASKS,projects:PROJECTS,team:TEAM,taskStatuses:TASK_STATUSES,users:USERS,notifConfig:NOTIF_CONFIG,notifPrefs:NOTIF_PREFS,reminderIntervals:REMINDER_INTERVALS,pricingDB:PRICING_DB,savedAt:new Date().toISOString()};
+    const encoded=btoa(unescape(encodeURIComponent(JSON.stringify(payload,null,2))));
+    const body={message:'PAH users update',content:encoded,branch:GH.branch};
+    if(window._ghSha) body.sha=window._ghSha;
+    const r=await fetch(url,{method:'PUT',headers:{Authorization:`token ${tok}`,'Content-Type':'application/json'},body:JSON.stringify(body)});
+    if(!r.ok){ const e=await r.json(); throw new Error(e.message||r.status); }
+    const j=await r.json();
+    window._ghSha=j.content.sha;
+    toast('☁️ Users saved');
+  }catch(e){
+    console.warn('saveUsers error:',e.message);
+    toast('⚠️ Users save failed: '+e.message);
+  }
+}
+
+const GH={
+  owner:'pmirzapanah-hub',
+  repo:'index',
+  file:'data.json',
+  branch:'main'
+};
+
+function setGhToken(){
+  const t = prompt('🔑 Paste your GitHub Personal Access Token:');
+  if(t && t.trim()){
+    sessionStorage.setItem('pah_gh_token', t.trim());
+    // updateGhTokenUI removed
+    toast('✅ GitHub token saved for this session');
+  }
+}
+function clearGhToken(){
+  sessionStorage.removeItem('pah_gh_token');
+  // updateGhTokenUI removed
+  toast('🗑️ GitHub token cleared');
+}
+function updateGhTokenUI(){
+  const tok = sessionStorage.getItem('pah_gh_token');
+  // settings page status text
+  const el = document.getElementById('gh-token-status');
+  if(el){
+    el.textContent = tok ? '✅ Token active' : '⚠️ Not active';
+    el.style.color = tok ? 'var(--green)' : 'var(--red)';
+  }
+  // topbar indicator dot
+  const dot = document.getElementById('token-indicator');
+  const lbl = document.getElementById('token-indicator-label');
+  if(dot){
+    dot.className = tok ? 'active' : 'inactive';
+  }
+  if(lbl){
+    lbl.textContent = tok ? 'Token active' : 'Token inactive';
+    lbl.style.color = tok ? 'var(--green)' : 'var(--red)';
+  }
+}
+
+function toggleLoginPassword(){
+  const inp = document.getElementById('login-pass');
+  const btn = document.getElementById('login-pass-toggle');
+  if(!inp||!btn) return;
+  if(inp.type==='password'){ inp.type='text'; btn.textContent='Hide'; }
+  else { inp.type='password'; btn.textContent='Show'; }
+}
+
+function toggleSettingPassword(btn){
+  const inp=document.getElementById('set-password');
+  if(!inp||!btn) return;
+  if(inp.type==='password'){ inp.type='text'; btn.textContent='Hide'; }
+  else { inp.type='password'; btn.textContent='Show'; }
+}
+
+async function changeMyPassword(){
+  const pw = document.getElementById('set-password')?.value.trim();
+  const confirmEl = document.getElementById('set-password-confirm');
+  if(!pw || pw.length < 6){ toast('⚠️ Password must be at least 6 characters'); return; }
+  if(confirmEl && confirmEl.value && confirmEl.value !== pw){
+    toast('⚠️ Passwords do not match'); return;
+  }
+  if(!currentUser){ toast('⚠️ Not signed in'); return; }
+  const u = USERS.find(x => x.username === currentUser.username);
+  if(!u){ toast('⚠️ User not found'); return; }
+  u.passwordHash = await sha256(pw);
+  await save(); // saves to localStorage + pushes to GitHub
+  document.getElementById('set-password').value = '';
+  if(confirmEl) confirmEl.value = '';
+  toast('✅ Password updated — takes effect on next login');
+}
+
+const ENCRYPTED_TOKEN = {"salt": "6TSXf13ZpQ5pOSINzIb7yw==", "iv": "PrdkkIu7kvWC8HNl", "data": "PtTsgVIviqm2Iyy5fHQM+L9ha86qEezz8uTAqxamSys4I22yMSbfmORpJ55wn2EZ1uzh4kKIZKg="};
+const ENCRYPTED_ANTHROPIC = {"salt": "8RH+eEDxgr4rBiHn0sQAwQ==", "iv": "h2iBTiUB3ZbWwYYh", "data": "IFkLEI19k5zAEywPr1xi05AEGXd72wjJPKhQZCVDHWCJ1MGmKzGvR2cf4q2wtZmRvBfbHxLdIUW8evStJdkWNYiCDJ7XdiOu5p0/HXDcLTRwc4gYPIGGJFKcueG31vqD6qkWQoEPQ8rkq6SGZ8/rS2HQRBt41b+4jzbNyA=="};
+
+async function deriveKey(password, saltB64){
+  const enc = new TextEncoder();
+  const km = await crypto.subtle.importKey('raw', enc.encode(password), 'PBKDF2', false, ['deriveKey']);
+  const salt = Uint8Array.from(atob(saltB64), c=>c.charCodeAt(0));
+  return crypto.subtle.deriveKey(
+    {name:'PBKDF2', salt, iterations:100000, hash:'SHA-256'},
+    km, {name:'AES-GCM', length:256}, false, ['decrypt']
+  );
+}
+
+async function decryptToken(password){
+  try{
+    const enc=new TextEncoder();
+    const key=await deriveKey(password, ENCRYPTED_TOKEN.salt);
+    const iv=Uint8Array.from(atob(ENCRYPTED_TOKEN.iv),c=>c.charCodeAt(0));
+    const data=Uint8Array.from(atob(ENCRYPTED_TOKEN.data),c=>c.charCodeAt(0));
+    const decrypted=await crypto.subtle.decrypt({name:'AES-GCM',iv},key,data);
+    return new TextDecoder().decode(decrypted);
+  }catch(e){ return null; }
+}
+
+async function getAnthropicKey(){
+  // check session cache first
+  const cached = sessionStorage.getItem('pah_anthropic_key');
+  if(cached) return cached;
+  // auto-decrypt with same password
+  try{
+    const enc = new TextEncoder();
+    const key = await deriveKey('Admin_vipcabinets', ENCRYPTED_ANTHROPIC.salt);
+    const iv = Uint8Array.from(atob(ENCRYPTED_ANTHROPIC.iv), c=>c.charCodeAt(0));
+    const data = Uint8Array.from(atob(ENCRYPTED_ANTHROPIC.data), c=>c.charCodeAt(0));
+    const decrypted = await crypto.subtle.decrypt({name:'AES-GCM', iv}, key, data);
+    const apiKey = new TextDecoder().decode(decrypted);
+    sessionStorage.setItem('pah_anthropic_key', apiKey);
+    return apiKey;
+  }catch(e){
+    console.warn('Anthropic key decrypt failed:', e.message);
+    return null;
+  }
+}
+
+async function getOrAskToken(){
+  
+  const cached=sessionStorage.getItem('pah_gh_token');
+  if(cached) return cached;
+  
+  const tok=await decryptToken('Admin_vipcabinets');
+  if(tok){
+    sessionStorage.setItem('pah_gh_token',tok);
+    updateGhTokenUI();
+    return tok;
+  }
+  // decrypt failed, skip sync
+  console.warn('GitHub token decrypt failed — sync disabled this session');
+  return null;
+}
+
+async function submitPassword(){
+  const pw = document.getElementById('pw-input').value.trim();
+  if(!pw){ showPwError('Please enter your password.'); return; }
+  document.getElementById('pw-btn').textContent='Unlocking…';
+  const token = await decryptToken(pw);
+  document.getElementById('pw-btn').textContent='Unlock';
+  if(!token){ showPwError('❌ Wrong password. Try again.'); document.getElementById('pw-input').value=''; document.getElementById('pw-input').focus(); return; }
+  sessionStorage.setItem('pah_gh_token', token);
+  document.getElementById('pw-modal').classList.remove('open');
+  updateGhTokenUI();
+  toast('✅ Unlocked — syncing to GitHub…');
+  if(window._pwResolve){ window._pwResolve(token); window._pwResolve=null; }
+}
+
+function showPwError(msg){ const e=document.getElementById('pw-error'); e.textContent=msg; e.style.display='block'; }
+
+function cancelPassword(){
+  document.getElementById('pw-modal').classList.remove('open');
+  if(window._pwResolve){ window._pwResolve(null); window._pwResolve=null; }
+  toast('⚠️ GitHub sync disabled — no password entered');
+}
+
+async function loadFromGitHub(){
+  try{
+    const tok=await getOrAskToken();
+    if(!tok){ console.log('GitHub load skipped — no token'); return false; }
+    const url=`https://api.github.com/repos/${GH.owner}/${GH.repo}/contents/${GH.file}`;
+    const r=await fetch(url,{headers:{Authorization:`token ${tok}`,Accept:'application/vnd.github.v3+json'}});
+    if(r.status===404){ console.log('No data.json yet — will create on first save.'); return false; }
+    if(!r.ok) throw new Error('GitHub load failed: '+r.status);
+    const j=await r.json();
+    window._ghSha=j.sha;
+    const decoded=JSON.parse(atob(j.content.split('\n').join('')));
+    // only use github data if it actually has stuff
+    if(decoded.tasks        && decoded.tasks.length        > 0) TASKS         = decoded.tasks;
+    if(decoded.projects     && decoded.projects.length     > 0) PROJECTS      = decoded.projects;
+    if(decoded.team         && decoded.team.length         > 0) TEAM          = decoded.team;
+    if(decoded.taskStatuses && decoded.taskStatuses.length > 0) TASK_STATUSES = decoded.taskStatuses;
+    if(decoded.users        && decoded.users.length        > 0) USERS         = decoded.users;
+    // load notification config (sync across devices)
+    if(decoded.notifConfig)        NOTIF_CONFIG        = {...NOTIF_CONFIG, ...decoded.notifConfig};
+    if(decoded.notifPrefs)         NOTIF_PREFS         = {...NOTIF_PREFS,  ...decoded.notifPrefs};
+    if(decoded.reminderIntervals && decoded.reminderIntervals.length > 0) REMINDER_INTERVALS = decoded.reminderIntervals;
+    if(decoded.pricingDB) PRICING_DB = {...PRICING_DB, ...decoded.pricingDB};
+    // mirror to localStorage as cache
+    localStorage.setItem('pah_notif_config',      JSON.stringify(NOTIF_CONFIG));
+    localStorage.setItem('pah_notif_prefs',       JSON.stringify(NOTIF_PREFS));
+    localStorage.setItem('pah_reminder_intervals',JSON.stringify(REMINDER_INTERVALS));
+    console.log('✅ Data loaded from GitHub');
+    return true;
+  }catch(e){
+    console.warn('GitHub load error:',e.message);
+    return false;
+  }
+}
+
+async function saveToGitHub(){
+  const tok=await getOrAskToken();
+  if(!tok){ console.log('GitHub sync skipped — no token'); return; }
+  try{
+    const url=`https://api.github.com/repos/${GH.owner}/${GH.repo}/contents/${GH.file}`;
+    // get current sha
+    const check=await fetch(url,{headers:{Authorization:`token ${tok}`,Accept:'application/vnd.github.v3+json'}});
+    if(check.ok){ const cj=await check.json(); window._ghSha=cj.sha; }
+    else { window._ghSha=null; }
+    const payload={tasks:TASKS,projects:PROJECTS,team:TEAM,taskStatuses:TASK_STATUSES,users:USERS,notifConfig:NOTIF_CONFIG,notifPrefs:NOTIF_PREFS,reminderIntervals:REMINDER_INTERVALS,pricingDB:PRICING_DB,savedAt:new Date().toISOString()};
+    const encoded=btoa(unescape(encodeURIComponent(JSON.stringify(payload,null,2))));
+    const body={message:'PAH update '+new Date().toLocaleString(),content:encoded,branch:GH.branch};
+    if(window._ghSha) body.sha=window._ghSha;
+    const r=await fetch(url,{method:'PUT',headers:{Authorization:`token ${tok}`,'Content-Type':'application/json'},body:JSON.stringify(body)});
+    if(!r.ok){ const e=await r.json(); throw new Error(e.message||r.status); }
+    const j=await r.json();
+    window._ghSha=j.content.sha;
+    if(!window._suppressGhToast) toast('☁️ Saved to GitHub');
+    window._suppressGhToast=false;
+  }catch(e){
+    console.warn('GitHub save error:',e.message);
+    window._suppressGhToast=false;
+    toast('⚠️ GitHub save failed: '+e.message);
+  }
+}
+
+const msalConfig={auth:{clientId:'b2254255-5b58-4bc1-8144-e2d54b26327b',authority:'https://login.microsoftonline.com/common',redirectUri:window.location.origin+window.location.pathname},cache:{cacheLocation:'sessionStorage',storeAuthStateInCookie:false}};
+const SCOPES=['Files.Read','Files.ReadWrite','User.Read'];
+let msalApp=null,token=null,odView='grid',odPath=[{id:'root',name:'🏠 My Drive'}],selId=null,sTimer=null,odPageSize=100;
+let odPageStack={dash:[],full:[]},odCurrentPage={dash:0,full:0},odAllItems={dash:[],full:[]};
+
+async function loadData(){
+  // Prefer syncing from GitHub if we have a token (so server acts as source of truth).
+  const tok = sessionStorage.getItem('pah_gh_token');
+  if(tok){
+    const ok = await loadFromGitHub();
+    if(ok) return;
+  }
+
+  try{
+    TASKS        = JSON.parse(localStorage.getItem('pah_tasks'))        || [];
+    PROJECTS     = JSON.parse(localStorage.getItem('pah_projects'))     || [];
+    TEAM         = JSON.parse(localStorage.getItem('pah_team'))         || [];
+    TASK_STATUSES= JSON.parse(localStorage.getItem('pah_task_statuses'))|| defaultTaskStatuses();
+    USERS        = JSON.parse(localStorage.getItem('pah_users'))        || [];
+  }catch(e){
+    TASKS=[]; PROJECTS=[]; TEAM=[]; TASK_STATUSES=defaultTaskStatuses(); USERS=[];
+  }
+}
+
+async function save(){
+  localStorage.setItem('pah_tasks',JSON.stringify(TASKS));
+  localStorage.setItem('pah_projects',JSON.stringify(PROJECTS));
+  localStorage.setItem('pah_team',JSON.stringify(TEAM));
+  localStorage.setItem('pah_task_statuses',JSON.stringify(TASK_STATUSES));
+  localStorage.setItem('pah_users',JSON.stringify(USERS));
+  await saveToGitHub();
+}
+
+let TASKS=[], PROJECTS=[], TEAM=[], TASK_STATUSES=[];
+
+function defaultTaskStatuses(){ return [
+  {id:'pending', label:'Pending', color:'var(--gold)', done:false},
+  {id:'in-progress', label:'In Progress', color:'var(--blue)', done:false},
+  {id:'done', label:'Done', color:'var(--green)', done:true},
+  {id:'blocked', label:'Blocked', color:'var(--red)', done:false},
+];}
+
+function defaultTasks(){return[
+  {id:1,name:'Review Q1 budget report',done:true,pri:'h',due:'2026-03-09'},
+  {id:2,name:'Send stakeholder update',done:false,pri:'h',due:'2026-03-09'},
+  {id:3,name:'Update project timeline',done:false,pri:'m',due:'2026-03-10'},
+  {id:4,name:'Schedule team stand-up',done:true,pri:'l',due:'2026-03-09'},
+  {id:5,name:'Prepare compliance checklist',done:false,pri:'m',due:'2026-03-11'},
+  {id:6,name:'Archive sprint files',done:false,pri:'l',due:'2026-03-12'},
+];}
+function defaultProjects(){return[
+  {id:1,name:'PAH Web v1.1',desc:'Admin panel upgrade',progress:78,status:'on-track',due:'2026-03-20'},
+  {id:2,name:'Client Portal',desc:'External client access',progress:45,status:'at-risk',due:'2026-03-15'},
+  {id:3,name:'Data Migration',desc:'Legacy system transfer',progress:60,status:'in-progress',due:'2026-04-01'},
+  {id:4,name:'Compliance Audit',desc:'Annual review prep',progress:30,status:'overdue',due:'2026-03-05'},
+];}
+function defaultTeam(){return[
+  {id:1,name:'Payam Mirzapanah',role:'Project Manager',status:'online',color:'#1565c0'},
+  {id:2,name:'Shahram ES`haghi',role:'Manager',status:'online',color:'#2e7d32'},
+  {id:3,name:'Clara Lee',role:'Designer',status:'away',color:'#e65100'},
+
+];}
+
+let nextId={task:100,project:100,team:100};
+
+// Reminder timers per task id
+
+let NOTIF_PREFS = {
+  browser: true,
+  banner:  true,
+  email:   false,
+  sms:     false
+};
+let NOTIF_CONFIG = {
+  ejsPublicKey: '',
+  ejsServiceId: '',
+  ejsTemplateId: '',
+  toEmail: '',
+  toSms: ''
+};
+/* Default reminder intervals in hours before due */
+let REMINDER_INTERVALS = [0, 1, 24, 48, 168]; // now, 1h, 1d, 2d, 1w
+
+function loadNotifSettings(){
+  try{
+    const p = localStorage.getItem('pah_notif_prefs');
+    if(p) NOTIF_PREFS = {...NOTIF_PREFS, ...JSON.parse(p)};
+    const cfg = localStorage.getItem('pah_notif_config');
+    if(cfg) NOTIF_CONFIG = {...NOTIF_CONFIG, ...JSON.parse(cfg)};
+    const ri = localStorage.getItem('pah_reminder_intervals');
+    if(ri) REMINDER_INTERVALS = JSON.parse(ri);
+  }catch(e){}
+  // if localStorage was empty but GitHub already loaded data into NOTIF_CONFIG,
+  // write it back so future loads are instant
+  if(NOTIF_CONFIG.ejsPublicKey){
+    localStorage.setItem('pah_notif_config', JSON.stringify(NOTIF_CONFIG));
+  }
+}
+
+async function saveNotifConfig(){
+  NOTIF_CONFIG.ejsPublicKey  = document.getElementById('ejs-pubkey')?.value.trim()||'';
+  NOTIF_CONFIG.ejsServiceId  = document.getElementById('ejs-service')?.value.trim()||'';
+  NOTIF_CONFIG.ejsTemplateId = document.getElementById('ejs-template')?.value.trim()||'';
+  NOTIF_CONFIG.toEmail       = document.getElementById('ejs-email')?.value.trim()||'';
+  NOTIF_CONFIG.toSms         = document.getElementById('ejs-sms')?.value.trim()||'';
+  localStorage.setItem('pah_notif_config', JSON.stringify(NOTIF_CONFIG));
+  localStorage.setItem('pah_notif_prefs', JSON.stringify(NOTIF_PREFS));
+  localStorage.setItem('pah_reminder_intervals', JSON.stringify(REMINDER_INTERVALS));
+  setupTaskReminders();
+  // show saving indicator
+  const st = document.getElementById('ejs-status');
+  if(st){ st.style.display='block'; st.style.color='var(--text-dim)'; st.textContent='Saving to GitHub…'; }
+  const btn = document.querySelector('[onclick="saveNotifConfig()"]');
+  if(btn){ btn.disabled=true; btn.textContent='Saving…'; }
+  window._suppressGhToast=true; // status shown inline instead
+  await saveToGitHub();
+  // update status
+  if(st){ st.style.color='var(--green)'; st.textContent='✅ Saved & synced to GitHub!'; setTimeout(()=>st.style.display='none',4000); }
+  if(btn){ btn.disabled=false; btn.textContent='💾 Save Config'; }
+}
+
+function toggleNotifPref(type, el){
+  el.classList.toggle('on');
+  NOTIF_PREFS[type] = el.classList.contains('on');
+  localStorage.setItem('pah_notif_prefs', JSON.stringify(NOTIF_PREFS));
+  if(type==='browser' && NOTIF_PREFS.browser) requestNotificationPermission();
+  saveToGitHub();
+}
+
+function populateProfileSettings(){
+  if(!currentUser) return;
+
+  const u = USERS.find(x => x.username.toLowerCase() === currentUser.username.toLowerCase()) || currentUser;
+  const role = (u.role || currentUser.role || '').toLowerCase();
+  const isAdmin   = role === 'admin';
+  const isManager = role === 'manager';
+  const isViewer  = !isAdmin && !isManager;
+
+  // fill profile fields
+  document.getElementById('set-name').value        = u.username || '';
+  document.getElementById('set-role').value        = u.role || currentUser.role || '';
+  document.getElementById('set-displayname').value = u.displayName || u.username || '';
+  document.getElementById('set-email').value       = u.email || '';
+
+  // helper to show/hide a section by id
+  const show = (id, visible) => {
+    const el = document.getElementById(id);
+    if(el) el.style.display = visible ? '' : 'none';
+  };
+
+  // admin role — full access
+  if(isAdmin){
+    show('settings-preferences',   true);
+    show('emailjs-config-section', true);
+    show('settings-reminders',     true);
+    show('settings-onedrive',      true);
+    show('settings-task-statuses', true);
+    show('user-accounts-section',  true);
+    show('settings-pricing',       true);
+    show('settings-github',        true);
+    const adminBtns = document.getElementById('gh-admin-btns');
+    const tokenDesc = document.getElementById('gh-token-desc');
+    if(adminBtns) adminBtns.style.display = '';
+    if(tokenDesc) tokenDesc.style.display = '';
+    return;
+  }
+
+  // manager — can see most things, add users, but NOT email/sms config
+  if(isManager){
+    show('settings-preferences',   true);
+    show('emailjs-config-section', false);
+    show('settings-reminders',     false);
+    show('settings-onedrive',      true);
+    show('settings-task-statuses', true);
+    show('user-accounts-section',  true);
+    show('settings-pricing',       false);
+    show('settings-github',        true);
+    const adminBtns = document.getElementById('gh-admin-btns');
+    const tokenDesc = document.getElementById('gh-token-desc');
+    if(adminBtns) adminBtns.style.display = '';
+    if(tokenDesc) tokenDesc.style.display = '';
+    return;
+  }
+
+  // viewer — only Profile + GitHub token status (read-only)
+  show('settings-preferences',   false);
+  show('emailjs-config-section', false);
+  show('settings-reminders',     false);
+  show('settings-onedrive',      false);
+  show('settings-task-statuses', false);
+  show('user-accounts-section',  false);
+  show('settings-pricing',       false);
+  show('settings-github',        true);
+  // hide the Enter Password / Clear buttons for viewers — status only
+  const adminBtns = document.getElementById('gh-admin-btns');
+  const tokenDesc = document.getElementById('gh-token-desc');
+  if(adminBtns) adminBtns.style.display = 'none';
+  if(tokenDesc) tokenDesc.style.display = 'none';
+}
+
+function saveProfileSettings(){
+  if(!currentUser) return;
+  const u = USERS.find(x => x.username === currentUser.username);
+  if(!u){ toast('User not found'); return; }
+  const displayName = document.getElementById('set-displayname')?.value.trim();
+  const email = document.getElementById('set-email')?.value.trim();
+  if(displayName) u.displayName = displayName;
+  if(email){
+    u.email = email;
+    // also sync to notification config so emails go to right address
+    NOTIF_CONFIG.toEmail = email;
+    localStorage.setItem('pah_notif_config', JSON.stringify(NOTIF_CONFIG));
+    const ejsEmail = document.getElementById('ejs-email');
+    if(ejsEmail) ejsEmail.value = email;
+  }
+  save(); // save() calls saveToGitHub which includes notifConfig in payload
+  toast('✅ Profile saved');
+}
+
+function populateNotifSettings(){
+  const set = (id, val) => { const el=document.getElementById(id); if(el) el.value=val||''; };
+  set('ejs-pubkey',   NOTIF_CONFIG.ejsPublicKey);
+  set('ejs-service',  NOTIF_CONFIG.ejsServiceId);
+  set('ejs-template', NOTIF_CONFIG.ejsTemplateId);
+  set('ejs-email',    NOTIF_CONFIG.toEmail);
+  set('ejs-sms',      NOTIF_CONFIG.toSms);
+  const tog = (id, val) => { const el=document.getElementById(id); if(el){ el.classList.toggle('on', val); } };
+  tog('toggle-browser-notif', NOTIF_PREFS.browser);
+  tog('toggle-banner-notif',  NOTIF_PREFS.banner);
+  tog('toggle-email-notif',   NOTIF_PREFS.email);
+  tog('toggle-sms-notif',     NOTIF_PREFS.sms);
+  renderReminderSchedule();
+}
+
+const INTERVAL_LABELS = {0:'At due time', 1:'1 hour before', 2:'2 hours before', 3:'3 hours before',
+  6:'6 hours before', 12:'12 hours before', 24:'1 day before', 48:'2 days before',
+  72:'3 days before', 168:'1 week before', 336:'2 weeks before'};
+
+function renderReminderSchedule(){
+  const el = document.getElementById('reminder-schedule-list');
+  if(!el) return;
+  el.innerHTML = REMINDER_INTERVALS.map((h,i)=>`
+    <div style="display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid var(--border2)">
+      <select class="modal-input" style="flex:1" onchange="updateReminderInterval(${i},this.value)">
+        ${Object.entries(INTERVAL_LABELS).map(([v,l])=>`<option value="${v}" ${parseInt(h)===parseInt(v)?'selected':''}>${l}</option>`).join('')}
+      </select>
+      <button class="btn btn-danger btn-sm" onclick="removeReminderInterval(${i})">✕</button>
+    </div>`).join('');
+}
+
+function addReminderInterval(){
+  REMINDER_INTERVALS.push(24);
+  localStorage.setItem('pah_reminder_intervals', JSON.stringify(REMINDER_INTERVALS));
+  renderReminderSchedule();
+  setupTaskReminders();
+  saveToGitHub();
+}
+
+function removeReminderInterval(i){
+  REMINDER_INTERVALS.splice(i,1);
+  localStorage.setItem('pah_reminder_intervals', JSON.stringify(REMINDER_INTERVALS));
+  renderReminderSchedule();
+  setupTaskReminders();
+  saveToGitHub();
+}
+
+function updateReminderInterval(i, val){
+  REMINDER_INTERVALS[i] = parseInt(val);
+  localStorage.setItem('pah_reminder_intervals', JSON.stringify(REMINDER_INTERVALS));
+  setupTaskReminders();
+  saveToGitHub();
+}
+
+function requestNotificationPermission(){
+  if(!('Notification' in window)) return;
+  if(Notification.permission==='default'){
+    Notification.requestPermission().then(p=>{
+      if(p==='granted') toast('✅ Browser notifications enabled');
+      else toast('⚠️ Browser notifications blocked');
+    });
+  }
+}
+
+function sendBrowserNotif(title, body, urgency='info'){
+  if(!NOTIF_PREFS.browser) return;
+  if(!('Notification' in window)) return;
+  if(Notification.permission==='granted'){
+    const n = new Notification(title,{body, icon:'pah-icon-192.png', badge:'pah-icon-192.png', silent:false, tag:title});
+    n.onclick = ()=>{ window.focus(); n.close(); };
+  }
+}
+
+function showBanner(title, msg, urgency='info', taskId=null){
+  if(!NOTIF_PREFS.banner) return;
+  const el = document.getElementById('notif-banner');
+  if(!el) return;
+  const id = 'nb_'+Date.now();
+  const card = document.createElement('div');
+  card.className = `notif-card ${urgency}`;
+  card.id = id;
+  const icon = urgency==='urgent'?'🚨':urgency==='warning'?'⚠️':'🔔';
+  card.innerHTML = `
+    <div class="notif-icon">${icon}</div>
+    <div class="notif-body">
+      <div class="notif-title">${title}</div>
+      <div class="notif-msg">${msg}</div>
+      ${taskId?`<span class="notif-dismiss" onclick="goTo('tasks')">View tasks →</span>`:''}
+    </div>
+    <button class="notif-close" onclick="dismissBanner('${id}')">✕</button>`;
+  el.appendChild(card);
+  // Auto-dismiss after 8 seconds
+  setTimeout(()=>dismissBanner(id), 8000);
+}
+
+function dismissBanner(id){
+  const el = document.getElementById(id);
+  if(el){ el.style.opacity='0'; el.style.transform='translateX(40px)'; el.style.transition='all 0.3s'; setTimeout(()=>el.remove(),300); }
+}
+
+async function sendEmailAlert(itemName, dueDate, itemType='Task', toOverride=null){
+  if(!NOTIF_PREFS.email && !toOverride) return;
+  if(!NOTIF_CONFIG.ejsPublicKey||!NOTIF_CONFIG.ejsServiceId||!NOTIF_CONFIG.ejsTemplateId) return;
+  if(!NOTIF_CONFIG.toEmail && !toOverride) return;
+  try{
+    await emailjs.init(NOTIF_CONFIG.ejsPublicKey);
+    const params = {
+      task_name:     itemName,
+      due_date:      dueDate,
+      item_type:     itemType,
+      to_email:      toOverride || NOTIF_CONFIG.toEmail
+    };
+    await emailjs.send(NOTIF_CONFIG.ejsServiceId, NOTIF_CONFIG.ejsTemplateId, params);
+    console.log('✅ Email sent for:', itemType, itemName);
+  }catch(e){
+    console.warn('EmailJS error:', e);
+  }
+}
+
+async function sendSmsAlert(itemName, dueDate, itemType='Task'){
+  if(!NOTIF_PREFS.sms) return;
+  if(!NOTIF_CONFIG.toSms) return;
+  await sendEmailAlert(itemName, dueDate, itemType, NOTIF_CONFIG.toSms);
+}
+
+function notify(title, body, urgency='info', task=null){
+  sendBrowserNotif(title, body, urgency);
+  showBanner(title, body, urgency, task?.id);
+  if(task){
+    const due = task.due||'';
+    sendEmailAlert(task.name, due, title);
+    sendSmsAlert(task.name, due, title);
+  }
+}
+
+async function testNotification(){
+  const st = document.getElementById('ejs-status');
+  if(st){ st.style.display='block'; st.style.color='var(--text-dim)'; st.textContent='Sending test…'; }
+  // Save config first
+  saveNotifConfig();
+  // Browser notif
+  requestNotificationPermission();
+  sendBrowserNotif('🧪 PAH Test', 'Browser notifications are working!');
+  // Banner
+  showBanner('🧪 Test Notification', 'In-app banner is working!', 'info');
+  // Email
+  if(NOTIF_PREFS.email && NOTIF_CONFIG.ejsPublicKey){
+    await sendEmailAlert('PAH Admin Test', new Date().toLocaleDateString(), 'Task');
+    if(st){ st.style.color='var(--green)'; st.textContent='✅ Test email sent! Check your inbox.'; }
+  } else {
+    if(st){ st.style.color='var(--gold)'; st.textContent='⚠️ Email disabled or not configured. Banner + browser test sent.'; }
+  }
+  // SMS
+  if(NOTIF_PREFS.sms && NOTIF_CONFIG.toSms){
+    await sendSmsAlert('PAH Admin Test', new Date().toLocaleDateString(), 'Task');
+  }
+}
+
+const reminderTimers = {};
+
+function clearTaskReminders(taskId){
+  if(!reminderTimers[taskId]) return;
+  reminderTimers[taskId].forEach(id=>clearTimeout(id));
+  delete reminderTimers[taskId];
+}
+
+function scheduleTaskReminders(task){
+  clearTaskReminders(task.id);
+  if(!task.due) return;
+  const due = new Date(task.due + 'T09:00:00'); // fire at 9am on due day
+  if(isNaN(due)) return;
+  const now = Date.now();
+  reminderTimers[task.id] = [];
+  REMINDER_INTERVALS.forEach(hours=>{
+    const when = due.getTime() - (hours * 60 * 60 * 1000);
+    const delay = when - now;
+    if(delay <= 0) return; // already past
+    const label = INTERVAL_LABELS[hours] || `${hours}h before`;
+    const urgency = hours===0?'urgent':hours<=2?'warning':'info';
+    const timer = setTimeout(()=>{
+      const current = TASKS.find(t=>t.id===task.id);
+      if(!current || current.done || current.due!==task.due) return;
+      notify(`Task Due: ${task.name}`, `${label} — due ${task.due}`, urgency, current, 'Task');
+    }, delay);
+    reminderTimers[task.id].push(timer);
+  });
+}
+
+function scheduleProjectReminders(project){
+  clearTaskReminders('proj_'+project.id);
+  if(!project.due) return;
+  const due = new Date(project.due + 'T09:00:00');
+  if(isNaN(due)) return;
+  const now = Date.now();
+  reminderTimers['proj_'+project.id] = [];
+  REMINDER_INTERVALS.forEach(hours=>{
+    const when = due.getTime() - (hours * 60 * 60 * 1000);
+    const delay = when - now;
+    if(delay <= 0) return;
+    const label = INTERVAL_LABELS[hours] || `${hours}h before`;
+    const urgency = hours===0?'urgent':hours<=2?'warning':'info';
+    const timer = setTimeout(()=>{
+      const current = PROJECTS.find(p=>p.id===project.id);
+      if(!current || current.status==='done' || current.due!==project.due) return;
+      notify(`Project Due: ${project.name}`, `${label} — due ${project.due}`, urgency, current, 'Project');
+    }, delay);
+    reminderTimers['proj_'+project.id].push(timer);
+  });
+}
+
+function setupTaskReminders(){
+  requestNotificationPermission();
+  Object.keys(reminderTimers).forEach(id=>clearTaskReminders(id));
+  TASKS.forEach(t=>{ if(!t.done) scheduleTaskReminders(t); });
+  PROJECTS.forEach(p=>{ if(p.status!=='done') scheduleProjectReminders(p); });
+}
+
+function migrateTasks(){
+  // Migrate tasks that have old boolean done field but no status field
+  let changed=false;
+  TASKS.forEach(t=>{
+    if(!t.status){
+      t.status = t.done ? 'done' : 'pending';
+      changed=true;
+    }
+  });
+  if(changed) save();
+}
+
+window.addEventListener('DOMContentLoaded',async()=>{
+  // auto-login as VIP-Cabinets for now
+  currentUser = {username:'VIP-Cabinets', role:'admin'};
+  loadData();          // load local data first
+  loadNotifSettings(); 
+  loadPricingSettings();
+  migrateTasks();      
+  await initDefaultUsers(); 
+
+  // auto-login: skip session check, always show app as VIP-Cabinets
+  showApp(currentUser);
+  renderAll();
+  setupTaskReminders();
+  {
+    const ghLoaded = await loadFromGitHub();
+    if(ghLoaded){
+      await initDefaultUsers();
+      // update local cache
+      localStorage.setItem('pah_tasks',JSON.stringify(TASKS));
+      localStorage.setItem('pah_projects',JSON.stringify(PROJECTS));
+      localStorage.setItem('pah_team',JSON.stringify(TEAM));
+      localStorage.setItem('pah_task_statuses',JSON.stringify(TASK_STATUSES));
+      localStorage.setItem('pah_users',JSON.stringify(USERS));
+      localStorage.setItem('pah_notif_config',JSON.stringify(NOTIF_CONFIG));
+      localStorage.setItem('pah_notif_prefs',JSON.stringify(NOTIF_PREFS));
+      localStorage.setItem('pah_reminder_intervals',JSON.stringify(REMINDER_INTERVALS));
+      renderAll(); setupTaskReminders();
+      // if settings page is open, refresh its fields with the newly loaded data
+      if(currentPage === 'settings'){
+        populateNotifSettings();
+        populateProfileSettings();
+        renderReminderSchedule();
+      }
+    }
+  }
+
+  try{
+    msalApp=new msal.PublicClientApplication(msalConfig);
+    await msalApp.initialize();
+    const resp=await msalApp.handleRedirectPromise();
+    if(resp?.accessToken){token=resp.accessToken;await afterSignIn(resp.account);return;}
+    const accounts=msalApp.getAllAccounts();
+    if(accounts.length) await silentLogin(accounts[0]);
+  }catch(e){console.error(e);}
+});
+
+let homeSearchFilter='all';
+let homeSearchTimer=null;
+
+function setSearchFilter(f){
+  homeSearchFilter=f;
+  document.querySelectorAll('.search-chip').forEach(el=>{
+    el.classList.toggle('active', el.dataset.filter===f);
+  });
+  const q=document.getElementById('mobile-search').value;
+  if(q.trim()) mobileSearch(q);
+}
+
+function clearHomeSearch(){
+  document.getElementById('mobile-search').value='';
+  document.getElementById('home-search-clear').style.display='none';
+  mobileSearch('');
+}
+
+function mobileSearch(q){
+  const resultsEl=document.getElementById('mobile-search-results');
+  const dashPanels=document.getElementById('dash-panels-wrap');
+  const clearBtn=document.getElementById('home-search-clear');
+  clearTimeout(homeSearchTimer);
+
+  if(clearBtn) clearBtn.style.display=q.trim()?'block':'none';
+
+  if(!q.trim()){
+    resultsEl.style.display='none';
+    dashPanels.style.display='flex';
+    return;
+  }
+  dashPanels.style.display='none';
+  resultsEl.style.display='block';
+
+  const f=homeSearchFilter;
+  const ql=q.toLowerCase();
+  const SML={'on-track':{label:'On Track',color:'var(--green)'},'at-risk':{label:'At Risk',color:'var(--gold)'},'in-progress':{label:'In Progress',color:'var(--blue)'},'overdue':{label:'Overdue',color:'var(--red)'},'done':{label:'Done',color:'var(--silver)'}};
+
+  const sectionHdr=(icon,label)=>`<div style="font-size:0.65rem;letter-spacing:1.5px;color:var(--text-dim);text-transform:uppercase;padding:10px 0 6px;font-weight:600;display:flex;align-items:center;gap:6px">${icon} ${label}</div>`;
+
+  let html='';
+
+  // ── Tasks ──
+  if(f==='all'||f==='tasks'){
+    const tasks=TASKS.filter(t=>t.name.toLowerCase().includes(ql));
+    if(tasks.length){
+      html+=sectionHdr('✅','Tasks');
+      html+=tasks.map(t=>{
+        const st=TASK_STATUSES.find(s=>s.id===t.status)||TASK_STATUSES[0];
+        return`<div style="padding:10px 12px;border-radius:8px;background:var(--surface2);border:1px solid var(--border2);margin-bottom:6px;display:flex;align-items:center;gap:10px;cursor:pointer" onclick="goTo('tasks')">
+          <span style="flex:1;font-size:0.85rem">${highlight(t.name,q)}</span>
+          <span style="font-size:0.65rem;padding:2px 8px;border-radius:8px;background:${st.color}22;color:${st.color};border:1px solid ${st.color}55">${st.label}</span>
+          <button class="btn btn-ghost btn-sm" onclick="event.stopPropagation();openTaskModal(${t.id})" style="padding:3px 8px">✏️</button>
+        </div>`;}).join('');
+    }
+  }
+
+  // ── Projects ──
+  if(f==='all'||f==='projects'){
+    const projects=PROJECTS.filter(p=>p.name.toLowerCase().includes(ql)||(p.desc||'').toLowerCase().includes(ql));
+    if(projects.length){
+      html+=sectionHdr('📋','Projects');
+      html+=projects.map(p=>{
+        const s=SML[p.status]||SML['in-progress'];
+        return`<div style="padding:10px 12px;border-radius:8px;background:var(--surface2);border:1px solid var(--border2);margin-bottom:6px;cursor:pointer" onclick="goTo('projects')">
+          <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px">
+            <span style="flex:1;font-size:0.85rem;font-weight:600">${highlight(p.name,q)}</span>
+            <span style="font-size:0.65rem;padding:2px 8px;border-radius:8px;background:${s.color}22;color:${s.color};border:1px solid ${s.color}55">${s.label}</span>
+          </div>
+          <div style="height:4px;background:var(--surface);border-radius:2px"><div style="height:100%;width:${p.progress}%;background:${s.color};border-radius:2px"></div></div>
+          <div style="font-size:0.7rem;color:var(--text-dim);margin-top:4px">${p.progress}% · Due ${p.due||'–'}</div>
+        </div>`;}).join('');
+    }
+  }
+
+  // ── Team ──
+  if(f==='all'||f==='team'){
+    const team=TEAM.filter(m=>m.name.toLowerCase().includes(ql)||(m.role||'').toLowerCase().includes(ql));
+    if(team.length){
+      html+=sectionHdr('👥','Team');
+      html+=team.map(m=>`<div style="padding:10px 12px;border-radius:8px;background:var(--surface2);border:1px solid var(--border2);margin-bottom:6px;display:flex;align-items:center;gap:10px;cursor:pointer" onclick="goTo('team')">
+        <div style="width:32px;height:32px;border-radius:50%;background:${m.color};display:grid;place-items:center;font-size:0.75rem;font-weight:700;color:#fff;flex-shrink:0">${m.name.split(' ').map(w=>w[0]).join('').slice(0,2)}</div>
+        <div style="flex:1"><div style="font-size:0.85rem;font-weight:600">${highlight(m.name,q)}</div><div style="font-size:0.72rem;color:var(--text-dim)">${m.role||'–'}</div></div>
+        ${m.phone?`<a href="tel:${m.phone}" class="btn btn-ghost btn-sm" onclick="event.stopPropagation()">📞</a>`:''}
+      </div>`).join('');
+    }
+  }
+
+  // ── OneDrive (Drive + Folders only) ──
+  if(f==='all'||f==='drive'||f==='folders'){
+    if(!token){
+      html+=sectionHdr('☁️','OneDrive');
+      html+=`<div style="padding:12px;border-radius:8px;background:var(--surface2);border:1px solid var(--border2);margin-bottom:6px;font-size:0.82rem;color:var(--text-dim)">Connect OneDrive to search files & folders</div>`;
+    } else {
+      // Show loading state immediately, then async fill in results
+      const driveSection=`<div id="hs-drive-section"></div>`;
+      html+=driveSection;
+      // Debounce OneDrive API call
+      homeSearchTimer=setTimeout(()=>searchOneDrive(q,f),400);
+    }
+  }
+
+  if(!html && f!=='drive' && f!=='folders'){
+    html=`<div style="text-align:center;padding:32px 16px;color:var(--text-dim)"><div style="font-size:2rem;margin-bottom:8px">🔍</div><div>No results for "<strong style="color:var(--text)">${q}</strong>"</div></div>`;
+  }
+  resultsEl.innerHTML=html;
+
+  // If drive search pending, show spinner in its section
+  if((f==='all'||f==='drive'||f==='folders') && token){
+    const ds=document.getElementById('hs-drive-section');
+    if(ds) ds.innerHTML=`<div id="hs-drive-inner">${sectionHdr('☁️',f==='folders'?'Folders':'Drive')}<div style="padding:12px 0;display:flex;align-items:center;gap:10px;color:var(--text-dim);font-size:0.82rem"><div class="spinner" style="width:16px;height:16px;border-width:2px"></div> Searching OneDrive…</div></div>`;
+  }
+}
+
+async function searchOneDrive(q, filter){
+  const foldersOnly = filter==='folders';
+  try{
+    // Use Graph search — filter to folders if needed
+    let url=`https://graph.microsoft.com/v1.0/me/drive/root/search(q='${encodeURIComponent(q)}')?$top=30&$select=id,name,folder,file,size,lastModifiedDateTime,parentReference`;
+    const d=await gGet(url);
+    let items=(d.value||[]);
+    if(foldersOnly) items=items.filter(i=>i.folder);
+
+    const sectionHdr=(icon,label)=>`<div style="font-size:0.65rem;letter-spacing:1.5px;color:var(--text-dim);text-transform:uppercase;padding:10px 0 6px;font-weight:600;display:flex;align-items:center;gap:6px">${icon} ${label}</div>`;
+    const ds=document.getElementById('hs-drive-inner')||document.getElementById('hs-drive-section');
+    if(!ds) return;
+
+    if(!items.length){
+      ds.innerHTML=sectionHdr('☁️',foldersOnly?'Folders':'Drive')+`<div style="padding:8px 0;font-size:0.82rem;color:var(--text-dim)">No ${foldersOnly?'folders':'files'} found in OneDrive</div>`;
+      return;
+    }
+
+    let html=sectionHdr('☁️',foldersOnly?'Folders':'Drive');
+    html+=items.map(item=>{
+      const isFolder=!!item.folder;
+      const icon=isFolder?'📁':'📄';
+      const parent=item.parentReference?.path?.replace('/drive/root:','').replace('/drive/root','') || '/';
+      const starred=isStarred(item.id)||isTaskStarred(item.id);
+      return`<div style="padding:10px 12px;border-radius:8px;background:var(--surface2);border:1px solid var(--border2);margin-bottom:6px;display:flex;align-items:center;gap:10px;cursor:pointer" onclick="${isFolder?`odJumpTo('${item.id}','${item.name.replace(/'/g,"\\'")}')`:``}">
+        <span style="font-size:1.4rem;flex-shrink:0">${icon}</span>
+        <div style="flex:1;min-width:0">
+          <div style="font-size:0.85rem;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${highlight(item.name,q)}</div>
+          <div style="font-size:0.68rem;color:var(--text-dim);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${parent||'/'}</div>
+        </div>
+        ${isFolder?`<button style="background:none;border:none;font-size:1.1rem;cursor:pointer;padding:4px" onclick="event.stopPropagation();toggleStar('${item.id}','${item.name.replace(/'/g,"\\'")}',event)" title="${starred?'Linked':'Add as project/task'}">${starred?'⭐':'☆'}</button>`:''}
+        ${!isFolder?`<button class="btn btn-ghost btn-sm" style="flex-shrink:0;padding:4px 8px" onclick="event.stopPropagation();dlFile('${item.id}','${item.name.replace(/'/g,"\\'")}')" title="Download">⬇️</button>`:''}
+      </div>`;}).join('');
+
+    ds.innerHTML=html;
+  }catch(e){
+    const ds=document.getElementById('hs-drive-inner')||document.getElementById('hs-drive-section');
+    if(ds) ds.innerHTML=`<div style="font-size:0.8rem;color:var(--red);padding:8px 0">⚠️ OneDrive search error: ${e.message}</div>`;
+  }
+}
+
+// Jump to a folder in the OneDrive panel from search results
+function odJumpTo(fid, fname){
+  odPath=[{id:'root',name:'🏠 My Drive'},{id:fid,name:fname}];
+  goTo('onedrive');
+  clearHomeSearch();
+  loadFolder(fid);
+}
+
+// Highlight matching text in results
+function highlight(text, q){
+  if(!q) return text;
+  const escaped=q.replace(/[.*+?^${}()|[\]\\]/g,'\\$&');
+  return text.replace(new RegExp(`(${escaped})`,'gi'),'<mark style="background:rgba(56,139,253,0.25);color:var(--blue);border-radius:2px;padding:0 1px">$1</mark>');
+}
+
+function toggleSidebar(){
+  const sb=document.getElementById('sidebar');
+  const ov=document.getElementById('sidebar-overlay');
+  const hb=document.getElementById('hamburger');
+  const open=sb.classList.toggle('open');
+  ov.classList.toggle('open',open);
+  hb.classList.toggle('open',open);
+}
+function closeSidebar(){
+  const sb=document.getElementById('sidebar');
+  if(!sb.classList.contains('open'))return;
+  sb.classList.remove('open');
+  document.getElementById('sidebar-overlay').classList.remove('open');
+  document.getElementById('hamburger').classList.remove('open');
+}
+
+let currentPage='dashboard';
+function goTo(page){
+  const prevPageEl = document.getElementById('page-'+currentPage);
+  if(prevPageEl) prevPageEl.classList.remove('active');
+  document.getElementById('nav-'+currentPage)?.classList.remove('active');
+  const oldBn=document.getElementById('bn-'+currentPage);
+  if(oldBn) oldBn.classList.remove('active');
+  currentPage=page;
+  const newPageEl = document.getElementById('page-'+page);
+  if(newPageEl) newPageEl.classList.add('active');
+  document.getElementById('nav-'+page)?.classList.add('active');
+  const newBn=document.getElementById('bn-'+page);
+  if(newBn) newBn.classList.add('active');
+  if(page==='onedrive') syncFullOdView();
+  if(page==='reports') renderReports();
+  if(page==='estimator'){ /* nothing to render */ }
+  if(page==='settings'){ renderTaskStatusList(); renderUsersList(); populateNotifSettings(); populateProfileSettings(); populatePricingSettings(); renderReminderSchedule(); updateGhTokenUI(); loadUsersFromGitHub().then(()=>{ renderUsersList(); populateProfileSettings(); populateNotifSettings(); renderReminderSchedule(); }); }
+  closeSidebar();
+}
+
+function renderAll(){
+  renderDashTasks();
+  renderTasksTable();
+  renderProjects();
+  renderTeam();
+  updateKPIs();
+  updateNavBadges();
+}
+
+function updateKPIs(){
+  const done=TASKS.filter(t=>t.done).length;
+  const kpProj=document.getElementById('kpi-proj'); if(kpProj) kpProj.textContent=PROJECTS.length;
+  const kpDone=document.getElementById('kpi-done'); if(kpDone) kpDone.textContent=done;
+  const kpTotal=document.getElementById('kpi-total'); if(kpTotal) kpTotal.textContent=TASKS.length;
+  const kpTeam=document.getElementById('kpi-team'); if(kpTeam) kpTeam.textContent=TEAM.length;
+  const dashCount=document.getElementById('dash-task-count'); if(dashCount) dashCount.textContent=TASKS.length;
+}
+function updateNavBadges(){
+  const pending=TASKS.filter(t=>!t.done).length;
+  document.getElementById('nb-projects').textContent=PROJECTS.length;
+  document.getElementById('nb-tasks').textContent=pending;
+  document.getElementById('nb-team').textContent=TEAM.length;
+  const bnb=document.getElementById('bnb-tasks');
+  if(bnb){bnb.textContent=pending;bnb.style.display=pending>0?'inline':'none';}
+}
+
+function renderDashTasks(){
+  const el=document.getElementById('dash-task-list');
+  if(!el) return;
+  if(!TASKS.length){el.innerHTML=`<div class="empty-state"><span>✅</span><p>No tasks yet.</p></div>`;return;}
+  el.innerHTML=TASKS.map(t=>{
+    const st=TASK_STATUSES.find(s=>s.id===t.status)||TASK_STATUSES[0];
+    return`<div class="task-item-dash">
+      <div class="task-cb${t.done?' done':''}" onclick="quickToggleTask(${t.id})"></div>
+      <span class="task-name-d${t.done?' done':''}">${t.name}</span>
+      <span class="task-pri pri-${t.pri}">${t.pri==='h'?'High':t.pri==='m'?'Med':'Low'}</span>
+      <span class="badge" style="background:${st.color}22;color:${st.color};border:1px solid ${st.color}55;font-size:0.6rem;padding:1px 6px;border-radius:8px;flex-shrink:0">${st.label}</span>
+      <button class="btn btn-ghost btn-sm" style="padding:3px 7px" onclick="openTaskModal(${t.id})" title="Edit">✏️</button>
+    </div>`;}).join('');
+}
+function quickToggleTask(id){
+  const t=TASKS.find(x=>x.id===id); if(!t)return;
+  // Cycle to next status
+  const idx=TASK_STATUSES.findIndex(s=>s.id===t.status);
+  const next=TASK_STATUSES[(idx+1)%TASK_STATUSES.length];
+  t.status=next.id; t.done=next.done;
+  save(); renderAll();
+}
+
+function renderTasksTable(){
+  const tb=document.getElementById('tasks-tbody');
+  const em=document.getElementById('tasks-empty');
+  if(!TASKS.length){tb.innerHTML='';em.style.display='block';return;}
+  em.style.display='none';
+  tb.innerHTML=TASKS.map(t=>`
+    <tr>
+      <td>${t.name}</td>
+      <td><span class="task-pri pri-${t.pri}">${t.pri==='h'?'High':t.pri==='m'?'Medium':'Low'}</span></td>
+      <td>${t.done?'<span class="badge badge-green">Done</span>':'<span class="badge badge-gold">Pending</span>'}</td>
+      <td style="color:var(--text-dim);font-size:0.78rem">${t.due||'–'}</td>
+      <td><div class="actions-cell">
+        <button class="btn btn-ghost btn-sm" onclick="openTaskModal(${t.id})">✏️ Edit</button>
+        <button class="btn btn-danger btn-sm" onclick="confirmDelete('task',${t.id},'${t.name.replace(/'/g,"\\'")}')">🗑️</button>
+      </div></td>
+    </tr>`).join('');
+}
+
+function populateTaskStatusDropdown(selectedId){
+  const sel=document.getElementById('task-status');
+  sel.innerHTML=TASK_STATUSES.map(s=>`<option value="${s.id}"${s.id===selectedId?' selected':''}>${s.label}</option>`).join('');
+}
+function openTaskModal(id=null, prefilledName=null, odFolderId=null){
+  document.getElementById('task-edit-id').value=id||'';
+  document.getElementById('task-od-folder-id').value=odFolderId||'';
+  document.getElementById('task-od-folder-id').value=odFolderId||'';
+  if(id){
+    const t=TASKS.find(x=>x.id===id);
+    document.getElementById('task-modal-title').textContent='Edit Task';
+    document.getElementById('task-modal-icon').textContent='✏️';
+    document.getElementById('task-name').value=t.name;
+    document.getElementById('task-pri').value=t.pri;
+    document.getElementById('task-due').value=t.due||'';
+    populateTaskStatusDropdown(t.status||'pending');
+  }else{
+    document.getElementById('task-modal-title').textContent='New Task';
+    document.getElementById('task-modal-icon').textContent='✅';
+    document.getElementById('task-name').value=prefilledName||'';
+    document.getElementById('task-pri').value='m';
+    document.getElementById('task-due').value='';
+    populateTaskStatusDropdown('pending');
+  }
+  openModal('task-modal');
+}
+function saveTask(){
+  const name=document.getElementById('task-name').value.trim();
+  if(!name){toast('⚠️ Task name is required');return;}
+  const id=document.getElementById('task-edit-id').value;
+  const statusId=document.getElementById('task-status').value;
+  const statusObj=TASK_STATUSES.find(s=>s.id===statusId)||TASK_STATUSES[0];
+  const data={name,pri:document.getElementById('task-pri').value,due:document.getElementById('task-due').value,status:statusId,done:statusObj.done};
+  const taskOdFid=document.getElementById('task-od-folder-id').value||null;
+  if(taskOdFid) data.odFolderId=taskOdFid;
+  if(id){Object.assign(TASKS.find(t=>t.id==id),data);toast('✅ Task updated');}
+  else{TASKS.push({id:++nextId.task,...data});toast('✅ Task added');}
+  save(); renderAll(); setupTaskReminders(); closeModal('task-modal');
+}
+
+const STATUS_MAP={
+  'on-track':{label:'On Track',cls:'badge-green'},
+  'at-risk':{label:'At Risk',cls:'badge-gold'},
+  'in-progress':{label:'In Progress',cls:'badge-blue'},
+  'overdue':{label:'Overdue',cls:'badge-red'},
+  'done':{label:'Done',cls:'badge-silver'},
+};
+const PROG_COLOR={'on-track':'var(--green)','at-risk':'var(--gold)','in-progress':'var(--blue)','overdue':'var(--red)','done':'var(--silver)'};
+
+function renderProjects(){
+  const el=document.getElementById('projects-list');
+  if(!PROJECTS.length){el.innerHTML=`<div class="empty-state"><span>📋</span><p>No projects yet. Click "+ New Project" to add one.</p></div>`;return;}
+  el.innerHTML=PROJECTS.map(p=>{
+    const s=STATUS_MAP[p.status]||STATUS_MAP['in-progress'];
+    const c=PROG_COLOR[p.status]||'var(--blue)';
+    return`<div class="project-card">
+      <div class="project-card-top">
+        <div><div class="project-card-title">📋 ${p.name}</div><div class="project-card-desc">${p.desc||''}</div></div>
+        <div style="display:flex;align-items:center;gap:8px;flex-shrink:0">
+          <span class="badge ${s.cls}">${s.label}</span>
+          <button class="btn btn-ghost btn-sm" onclick="openProjectModal(${p.id})">✏️</button>
+          <button class="btn btn-danger btn-sm" onclick="confirmDelete('project',${p.id},'${p.name.replace(/'/g,"\\'")}')">🗑️</button>
+        </div>
+      </div>
+      <div class="progress-bar"><div class="progress-fill" style="width:${p.progress}%;background:${c}"></div></div>
+      <div class="project-card-bottom"><span>${p.progress}% complete</span><span>Due ${p.due||'–'}</span></div>
+    </div>`;}).join('');
+}
+
+function openProjectModal(id=null, prefilledName=null, odFolderId=null){
+  document.getElementById('proj-edit-id').value=id||'';
+  document.getElementById('proj-od-folder-id').value=odFolderId||'';
+  if(id){
+    const p=PROJECTS.find(x=>x.id===id);
+    document.getElementById('proj-modal-title').textContent='Edit Project';
+    document.getElementById('proj-modal-icon').textContent='✏️';
+    document.getElementById('proj-name').value=p.name;
+    document.getElementById('proj-desc').value=p.desc||'';
+    document.getElementById('proj-progress').value=p.progress;
+    document.getElementById('proj-status').value=p.status;
+    document.getElementById('proj-due').value=p.due||'';
+    document.getElementById('proj-od-folder-id').value=p.odFolderId||'';
+  }else{
+    document.getElementById('proj-modal-title').textContent= odFolderId ? '⭐ Add Folder as Project' : 'New Project';
+    document.getElementById('proj-modal-icon').textContent= odFolderId ? '⭐' : '📋';
+    document.getElementById('proj-name').value=prefilledName||'';
+    document.getElementById('proj-desc').value=odFolderId?'Linked from OneDrive':'';
+    document.getElementById('proj-progress').value=0;
+    document.getElementById('proj-status').value='in-progress';
+    document.getElementById('proj-due').value='';
+  }
+  openModal('project-modal');
+}
+function saveProject(){
+  const name=document.getElementById('proj-name').value.trim();
+  if(!name){toast('⚠️ Project name is required');return;}
+  const id=document.getElementById('proj-edit-id').value;
+  const odFid=document.getElementById('proj-od-folder-id').value||null;
+  const data={name,desc:document.getElementById('proj-desc').value.trim(),progress:parseInt(document.getElementById('proj-progress').value)||0,status:document.getElementById('proj-status').value,due:document.getElementById('proj-due').value,odFolderId:odFid};
+  if(id){Object.assign(PROJECTS.find(p=>p.id==id),data);toast('✅ Project updated');}
+  else{PROJECTS.push({id:++nextId.project,...data});toast('✅ Project added');}
+  save(); renderAll(); closeModal('project-modal');
+  if(window._pendingTaskFromStar){
+    const p=window._pendingTaskFromStar; window._pendingTaskFromStar=null;
+    setTimeout(()=>openTaskModal(null, p.name, p.odFolderId), 250);
+  }
+  // If user chose "Add as both", open task modal after project saved
+  if(window._pendingTaskFromStar){
+    const p=window._pendingTaskFromStar; window._pendingTaskFromStar=null;
+    setTimeout(()=>openTaskModal(null, p.name, p.odFolderId), 200);
+  }
+}
+
+function renderTeam(){
+  const el=document.getElementById('team-list');
+  const em=document.getElementById('team-empty');
+  if(!TEAM.length){el.innerHTML='';em.style.display='block';return;}
+  em.style.display='none';
+  el.innerHTML=TEAM.map(m=>`
+    <div class="team-card">
+      <div class="av" style="background:${m.color}">${m.name.split(' ').map(w=>w[0]).join('').slice(0,2)}</div>
+      <div class="av-info">
+        <div class="av-name">${m.name}</div>
+        <div class="av-role">${m.role||'–'}</div>
+        ${m.phone?`<a href="tel:${m.phone}" style="font-size:0.72rem;color:var(--blue);text-decoration:none;margin-top:3px;display:inline-block" onclick="event.stopPropagation()">📞 ${m.phone}</a>`:''}
+      </div>
+      <span class="av-status ${m.status}">${m.status.charAt(0).toUpperCase()+m.status.slice(1)}</span>
+      <div style="display:flex;gap:6px;margin-left:8px;flex-wrap:wrap;align-items:center">
+        ${m.phone?`<a href="tel:${m.phone}" class="btn btn-ghost btn-sm" style="text-decoration:none" title="Call">📞</a>`:''}
+        <button class="btn btn-ghost btn-sm" onclick="openTeamModal(${m.id})">✏️ Edit</button>
+        <button class="btn btn-danger btn-sm" onclick="confirmDelete('team',${m.id},'${m.name.replace(/'/g,"\\'")}')">🗑️</button>
+      </div>
+    </div>`).join('');
+}
+
+function openTeamModal(id=null){
+  document.getElementById('team-edit-id').value=id||'';
+  if(id){
+    const m=TEAM.find(x=>x.id===id);
+    document.getElementById('team-modal-title').textContent='Edit Member';
+    document.getElementById('team-modal-icon').textContent='✏️';
+    document.getElementById('team-name').value=m.name;
+    document.getElementById('team-role').value=m.role||'';
+    document.getElementById('team-phone').value=m.phone||'';
+    document.getElementById('team-status').value=m.status;
+    document.getElementById('team-color').value=m.color||'#1565c0';
+  }else{
+    document.getElementById('team-modal-title').textContent='Add Member';
+    document.getElementById('team-modal-icon').textContent='👤';
+    document.getElementById('team-name').value='';
+    document.getElementById('team-role').value='';
+    document.getElementById('team-phone').value='';
+    document.getElementById('team-status').value='online';
+    document.getElementById('team-color').value='#1565c0';
+  }
+  openModal('team-modal');
+}
+function saveMember(){
+  const name=document.getElementById('team-name').value.trim();
+  if(!name){toast('⚠️ Name is required');return;}
+  const id=document.getElementById('team-edit-id').value;
+  const data={name,role:document.getElementById('team-role').value.trim(),phone:document.getElementById('team-phone').value.trim(),status:document.getElementById('team-status').value,color:document.getElementById('team-color').value};
+  if(id){Object.assign(TEAM.find(m=>m.id==id),data);toast('✅ Member updated');}
+  else{TEAM.push({id:++nextId.team,...data});toast('✅ Member added');}
+  save(); renderAll(); closeModal('team-modal');
+}
+
+function confirmDelete(type,id,name){
+  document.getElementById('confirm-name').textContent=`"${name}"`;
+  document.getElementById('confirm-yes').onclick=()=>{
+    if(type==='task')    TASKS   =TASKS.filter(x=>x.id!==id);
+    if(type==='project') PROJECTS=PROJECTS.filter(x=>x.id!==id);
+    if(type==='team')    TEAM    =TEAM.filter(x=>x.id!==id);
+    save(); renderAll(); closeModal('confirm-modal');
+    toast(`🗑️ Deleted "${name}"`);
+  };
+  openModal('confirm-modal');
+}
+
+function openModal(id){document.getElementById(id).classList.add('open');}
+function closeModal(id){document.getElementById(id).classList.remove('open');}
+// Close on overlay click
+document.querySelectorAll('.modal-overlay').forEach(o=>o.addEventListener('click',e=>{if(e.target===o)o.classList.remove('open');}));
+// Close on Escape
+document.addEventListener('keydown',e=>{if(e.key==='Escape')document.querySelectorAll('.modal-overlay.open').forEach(o=>o.classList.remove('open'));});
+
+function renderReports(){
+  const days=['Mon','Tue','Wed','Thu','Fri','Sat','Sun'];
+  const vals=[8,12,6,15,9,4,11];
+  const max=Math.max(...vals);
+  document.getElementById('chart-tasks').innerHTML=vals.map((v,i)=>`
+    <div class="bar-wrap"><div class="bar-val">${v}</div>
+    <div class="bar" style="height:${(v/max)*90}px;background:${i===3?'var(--blue)':'rgba(56,139,253,0.4)'}"></div>
+    <div class="bar-label">${days[i]}</div></div>`).join('');
+  document.getElementById('reports-projects').innerHTML=PROJECTS.length
+    ?PROJECTS.map(p=>{const s=STATUS_MAP[p.status]||STATUS_MAP['in-progress'];const c=PROG_COLOR[p.status]||'var(--blue)';return`<div style="display:flex;align-items:center;gap:14px;padding:10px 0;border-bottom:1px solid var(--border2)"><span style="flex:1;font-size:0.85rem">${p.name}</span><span class="badge ${s.cls}" style="flex-shrink:0">${s.label}</span><div class="progress-bar" style="width:140px"><div class="progress-fill" style="width:${p.progress}%;background:${c}"></div></div><span style="font-size:0.72rem;color:var(--text-dim);width:30px;text-align:right">${p.progress}%</span></div>`;}).join('')
+    :`<div class="empty-state"><span>📊</span><p>No projects to report.</p></div>`;
+}
+
+async function msalSignIn(){
+  if(!msalApp){toast('⚠️ Auth not ready');return;}
+  setState('loading');document.getElementById('s-loading-text').textContent='Opening Microsoft sign-in…';
+  try{
+    const r=await msalApp.loginPopup({scopes:SCOPES,prompt:'select_account'});
+    token=r.accessToken;await afterSignIn(r.account);
+  }catch(e){
+    if(e.errorCode==='user_cancelled'){setState('connect');toast('Sign-in cancelled');}
+    else{setState('error');document.getElementById('s-error-detail').textContent=e.message||String(e);}
+  }
+}
+async function silentLogin(account){
+  setState('loading');document.getElementById('s-loading-text').textContent='Restoring session…';
+  try{const r=await msalApp.acquireTokenSilent({scopes:SCOPES,account});token=r.accessToken;await afterSignIn(account);}
+  catch(e){setState('connect');}
+}
+async function afterSignIn(account){
+  try{
+    const me=await gGet('https://graph.microsoft.com/v1.0/me');
+    const name=me.displayName||me.userPrincipalName||account.name||'User';
+    // only update OneDrive-specific fields — do NOT overwrite the PAH login name
+    document.getElementById('od-account-lbl').textContent=`${me.userPrincipalName||name} — active until sign-out`;
+    document.getElementById('sf-account-lbl').textContent=`${me.userPrincipalName||name} — active until sign-out`;
+    const sp=document.getElementById('set-od-pill');sp.className='status-pill on';sp.style.cursor='default';
+    document.getElementById('set-od-status').textContent='Connected';
+  }catch(_){}
+  setPill(true);document.getElementById('sidebar-od-label').textContent='Sign Out OneDrive';
+  setState('ui');loadFolder('root');syncFullOdView();
+}
+async function msalSignOut(){
+  if(!confirm('Sign out of OneDrive?'))return;
+  token=null;const accounts=msalApp?.getAllAccounts()||[];
+  if(accounts.length)await msalApp.logoutPopup({account:accounts[0]}).catch(()=>{});
+  setPill(false);document.getElementById('sidebar-od-label').textContent='Connect OneDrive';
+  // restore PAH login user name (not OneDrive name)
+  if(currentUser){ document.getElementById('user-name').textContent=currentUser.username; document.getElementById('user-avatar').textContent=currentUser.username.slice(0,2).toUpperCase(); }
+  document.getElementById('kpi-files').textContent='–';document.getElementById('kpi-files-sub').textContent='Not connected';
+  const sp=document.getElementById('set-od-pill');sp.className='status-pill off';document.getElementById('set-od-status').textContent='Disconnected';
+  setState('connect');syncFullOdView();toast('🔓 Signed out of OneDrive');
+}
+function pillClick(){const a=msalApp?.getAllAccounts()||[];a.length?msalSignOut():msalSignIn();}
+function syncFullOdView(){
+  const conn=!!(msalApp?.getAllAccounts()?.length);
+  document.getElementById('sf-connect').style.display=conn?'none':'flex';
+  document.getElementById('sf-ui').style.display=conn?'flex':'none';
+  const b=document.getElementById('od-full-badge');
+  b.style.display=conn?'inline-flex':'none';
+  if(conn)loadFolder(odPath[odPath.length-1].id,true);
+}
+
+async function gGet(url){
+  if(!token)throw new Error('No token');
+  const r=await fetch(url,{headers:{Authorization:`Bearer ${token}`}});
+  if(!r.ok){const e=await r.json().catch(()=>({}));throw new Error(e.error?.message||`HTTP ${r.status}`);}
+  return r.json();
+}
+
+async function loadFolder(fid,full=false){
+  showSpinner(full);
+  const key=full?'full':'dash';
+  odCurrentPage[key]=0;
+  odPageStack[key]=[];
+  odAllItems[key]=[];
+  try{
+    let items=[];
+    if(odPageSize==='all'){
+      let url=fid==='root'?'https://graph.microsoft.com/v1.0/me/drive/root/children?$top=999&$orderby=name':`https://graph.microsoft.com/v1.0/me/drive/items/${fid}/children?$top=999&$orderby=name`;
+      while(url){const d=await gGet(url);items=items.concat(d.value||[]);url=d['@odata.nextLink']||null;}
+      odAllItems[key]=items;
+      renderItems(items,full);
+      updatePagination(full,items.length,false,false);
+    } else {
+      const top=odPageSize||100;
+      const url=fid==='root'?`https://graph.microsoft.com/v1.0/me/drive/root/children?$top=${top}&$orderby=name`:`https://graph.microsoft.com/v1.0/me/drive/items/${fid}/children?$top=${top}&$orderby=name`;
+      const d=await gGet(url);
+      items=d.value||[];
+      odAllItems[key]=items;
+      odPageStack[key]=[{items, nextLink:d['@odata.nextLink']||null}];
+      renderItems(items,full);
+      updatePagination(full,items.length,false,!!d['@odata.nextLink']);
+    }
+    document.getElementById('kpi-files').textContent=items.length;
+    document.getElementById('kpi-files-sub').textContent='Live OneDrive files';
+    document.getElementById(full?'sf-count-lbl':'od-count-lbl').textContent=`${items.length} shown`;
+    renderPath(full);
+  }catch(e){
+    if(!full){document.getElementById('s-error-detail').textContent=e.message;setState('error');}
+    else document.getElementById('sf-files').innerHTML=`<div class="no-results"><span>⚠️</span><p>${e.message}</p></div>`;
+  }
+}
+
+async function odChangePage(dir,full=false){
+  const key=full?'full':'dash';
+  const stack=odPageStack[key];
+  if(!stack||!stack.length) return;
+  if(dir===-1){
+    // Go to previous page
+    if(odCurrentPage[key]<=0) return;
+    odCurrentPage[key]--;
+    const pg=stack[odCurrentPage[key]];
+    renderItems(pg.items,full);
+    updatePagination(full,pg.items.length,odCurrentPage[key]>0,!!stack[odCurrentPage[key]+1]?.nextLink);
+    document.getElementById(full?'sf-count-lbl':'od-count-lbl').textContent=`${pg.items.length} shown`;
+  } else {
+    // Go to next page — fetch if needed
+    const current=stack[odCurrentPage[key]];
+    if(!current?.nextLink) return;
+    showSpinner(full);
+    try{
+      const d=await gGet(current.nextLink);
+      const items=d.value||[];
+      odCurrentPage[key]++;
+      if(!stack[odCurrentPage[key]]){
+        stack.push({items,nextLink:d['@odata.nextLink']||null});
+      }
+      renderItems(items,full);
+      updatePagination(full,items.length,true,!!d['@odata.nextLink']);
+      document.getElementById(full?'sf-count-lbl':'od-count-lbl').textContent=`${items.length} shown`;
+    }catch(e){ toast('❌ '+e.message); }
+  }
+  // Scroll file area back to top
+  const fc=document.getElementById(full?'sf-files':'od-files');
+  if(fc) fc.scrollTop=0;
+}
+
+function updatePagination(full,count,hasPrev,hasNext){
+  const key=full?'sf':'od';
+  const pgEl=document.getElementById(key+'-pagination');
+  const prevBtn=document.getElementById(key+'-pg-prev');
+  const nextBtn=document.getElementById(key+'-pg-next');
+  const infoEl=document.getElementById(key+'-pg-info');
+  if(!pgEl) return;
+  const pageNum=(full?odCurrentPage.full:odCurrentPage.dash)+1;
+  if(odPageSize==='all'||(!hasPrev&&!hasNext)){
+    pgEl.style.display='none';
+  } else {
+    pgEl.style.display='flex';
+    prevBtn.disabled=!hasPrev;
+    nextBtn.disabled=!hasNext;
+    infoEl.textContent=`Page ${pageNum}`;
+  }
+}
+function onSearch(q,full=false){
+  clearTimeout(sTimer);if(!q.trim()){loadFolder(odPath[odPath.length-1].id,full);return;}
+  sTimer=setTimeout(async()=>{showSpinner(full);try{const top=odPageSize==='all'?500:(odPageSize||100);const d=await gGet(`https://graph.microsoft.com/v1.0/me/drive/root/search(q='${encodeURIComponent(q)}')?$top=${top}`);renderItems(d.value||[],full);document.getElementById(full?'sf-count-lbl':'od-count-lbl').textContent=`${d.value?.length||0} results`;}catch(e){document.getElementById(full?'sf-files':'od-files').innerHTML=`<div class="no-results"><span>⚠️</span><p>${e.message}</p></div>`;}},400);
+}
+function refreshFiles(full=false){const inp=document.getElementById(full?'sf-search':'od-search');if(inp)inp.value='';loadFolder(odPath[odPath.length-1].id,full);toast('↻ Refreshed');}
+function isStarred(id){ return PROJECTS.some(p=>p.odFolderId===id); }
+function isTaskStarred(id){ return TASKS.some(t=>t.odFolderId===id); }
+
+function refreshStarUI(id){
+  const linked=isStarred(id)||isTaskStarred(id);
+  document.querySelectorAll('[data-fid="'+id+'"]').forEach(el=>{
+    el.classList.toggle('starred', linked);
+    el.title = linked?'Linked — click to remove':'Add as project / task';
+    el.textContent = linked?'⭐':'☆';
+  });
+}
+
+function toggleStar(id, name, event){
+  event.stopPropagation();
+  const linked=isStarred(id)||isTaskStarred(id);
+  if(linked){
+    const msgs=[];
+    if(isStarred(id)) msgs.push('Project: '+PROJECTS.find(p=>p.odFolderId===id)?.name);
+    if(isTaskStarred(id)) msgs.push('Task: '+TASKS.find(t=>t.odFolderId===id)?.name);
+    if(!confirm('Remove link(s) for this folder?\n'+msgs.join('\n'))) return;
+    PROJECTS=PROJECTS.filter(p=>p.odFolderId!==id);
+    TASKS=TASKS.filter(t=>t.odFolderId!==id);
+    save(); renderAll();
+    toast('Removed folder links');
+  } else {
+    document.getElementById('star-folder-id').value=id;
+    document.getElementById('star-folder-name').value=name;
+    document.getElementById('star-modal-folder').textContent=name;
+    openModal('star-choice-modal');
+  }
+  refreshStarUI(id);
+}
+
+function starAsProject(){
+  const id=document.getElementById('star-folder-id').value;
+  const name=document.getElementById('star-folder-name').value;
+  closeModal('star-choice-modal');
+  openProjectModal(null, name, id);
+}
+function starAsTask(){
+  const id=document.getElementById('star-folder-id').value;
+  const name=document.getElementById('star-folder-name').value;
+  closeModal('star-choice-modal');
+  openTaskModal(null, name, id);
+}
+function starAsBoth(){
+  const id=document.getElementById('star-folder-id').value;
+  const name=document.getElementById('star-folder-name').value;
+  closeModal('star-choice-modal');
+  window._pendingTaskFromStar={name, odFolderId:id};
+  openProjectModal(null, name, id);
+}
+
+function renderItems(items,full=false){
+  const c=document.getElementById(full?'sf-files':'od-files');
+  if(!items.length){c.innerHTML=`<div class="no-results"><span>📭</span><p>No files here</p></div>`;return;}
+  if(odView==='grid'){
+    c.innerHTML=`<div class="file-grid">${items.map(f=>{
+      const starred=isStarred(f.id);
+      const starBtn=f.folder?`<div class="file-star${starred?' starred':''}" data-fid="${f.id}" onclick="toggleStar('${f.id}','${esc(f.name)}',event)" title="${starred?'Remove project':'Add as project'}">${starred?'⭐':'☆'}</div>`:'';
+      const dlBtn=!f.folder?`<div class="file-dl-btn" onclick="dlFile('${f.id}','${esc(f.name)}',event)" title="Download">⬇</div>`:'';
+      return`<div class="file-card" id="${full?'sf':'fc'}${f.id}" onclick="clickItem('${f.id}','${esc(f.name)}',${!!f.folder},${full},event)">
+        ${starBtn}${dlBtn}
+        <div class="file-icon">${fIcon(f)}</div>
+        <div class="file-name">${f.name}</div>
+        <div class="file-size">${fSize(f.size)}</div>
+      </div>`;
+    }).join('')}</div>`;
+  }else{
+    c.innerHTML=`<div class="file-list-view">
+      <div class="file-row" style="opacity:.35;cursor:default;font-size:.68rem;letter-spacing:1.2px;text-transform:uppercase;pointer-events:none">
+        <span class="ri"></span><span class="rn">Name</span><span class="rm">Modified</span><span class="rs">Size</span>
+        <span class="rs-star" style="opacity:0">⭐</span><span class="rd" style="opacity:0">⬇</span>
+      </div>
+      ${items.map(f=>{
+        const starred=isStarred(f.id);
+        return`<div class="file-row" id="${full?'sf':'fc'}${f.id}" onclick="clickItem('${f.id}','${esc(f.name)}',${!!f.folder},${full},event)">
+          <span class="ri">${fIcon(f)}</span>
+          <span class="rn">${f.name}</span>
+          <span class="rm">${fDate(f.lastModifiedDateTime)}</span>
+          <span class="rs">${fSize(f.size)}</span>
+          ${f.folder?`<span class="rs-star${starred?' starred':''}" data-fid="${f.id}" onclick="toggleStar('${f.id}','${esc(f.name)}',event)" title="${starred?'Remove project':'Add as project'}">${starred?'⭐':'☆'}</span>`:'<span class="rs-star" style="opacity:0;pointer-events:none"></span>'}
+          ${!f.folder?`<span class="rd" onclick="dlFile('${f.id}','${esc(f.name)}',event)" title="Download">⬇</span>`:'<span class="rd" style="opacity:0;pointer-events:none"></span>'}
+        </div>`;
+      }).join('')}
+    </div>`;
+  }
+}
+function clickItem(id,name,isFolder,full,e){
+  if(selId){const o=document.getElementById((full?'sf':'fc')+selId);if(o)o.classList.remove('selected');}
+  selId=id;document.getElementById((full?'sf':'fc')+id)?.classList.add('selected');
+  if(isFolder){odPath.push({id,name});loadFolder(id,full);}
+}
+async function dlFile(id,name,e){
+  e.stopPropagation();toast(`⬇️ Preparing: ${name}`);
+  try{const d=await gGet(`https://graph.microsoft.com/v1.0/me/drive/items/${id}?select=@microsoft.graph.downloadUrl,name`);const url=d['@microsoft.graph.downloadUrl'];if(url){const a=document.createElement('a');a.href=url;a.download=name;a.target='_blank';document.body.appendChild(a);a.click();document.body.removeChild(a);toast(`✅ Downloading: ${name}`);}else toast('⚠️ Download URL not available');}
+  catch(e){toast(`❌ ${e.message}`);}
+}
+function renderPath(full=false){
+  const el=document.getElementById(full?'sf-path':'od-path');
+  el.innerHTML=odPath.map((p,i)=>{const last=i===odPath.length-1;return`${i>0?'<span class="od-path-sep">›</span>':''}<span class="crumb${last?' last':''}"${last?'':` onclick="navTo(${i},${full})"`}>${p.name}</span>`;}).join('');
+}
+function navTo(i,full=false){odPath=odPath.slice(0,i+1);loadFolder(odPath[odPath.length-1].id,full);}
+
+function renderTaskStatusList(){
+  const el=document.getElementById('task-status-list');
+  if(!el) return;
+  el.innerHTML=TASK_STATUSES.map((s,i)=>`
+    <div style="display:flex;align-items:center;gap:10px;padding:8px 6px;border-bottom:1px solid var(--border2)">
+      <div style="width:12px;height:12px;border-radius:50%;background:${s.color};flex-shrink:0"></div>
+      <span style="flex:1;font-size:0.85rem">${s.label}</span>
+      <span style="font-size:0.7rem;padding:2px 8px;border-radius:8px;background:${s.done?'rgba(63,185,80,0.12)':'rgba(56,139,253,0.12)'};color:${s.done?'var(--green)':'var(--blue)'}">${s.done?'Counts as Done':'In Progress'}</span>
+      ${TASK_STATUSES.length>1?`<button class="btn btn-danger btn-sm" onclick="deleteTaskStatus('${s.id}')">🗑️</button>`:''}
+    </div>`).join('');
+}
+
+function addTaskStatus(){
+  const label=prompt('New status name (e.g. "In Review", "Waiting"):');
+  if(!label||!label.trim()) return;
+  const colors=['var(--blue)','var(--gold)','var(--green)','var(--red)','var(--silver)'];
+  const color=colors[TASK_STATUSES.length % colors.length];
+  const isDone=confirm('Does this status count as "Done"?');
+  const id='custom-'+Date.now();
+  TASK_STATUSES.push({id, label:label.trim(), color, done:isDone});
+  save(); renderTaskStatusList();
+  toast('✅ Status "'+label.trim()+'" added');
+}
+
+function deleteTaskStatus(id){
+  const s=TASK_STATUSES.find(x=>x.id===id);
+  if(!s) return;
+  if(TASK_STATUSES.length<=1){ toast('⚠️ Need at least one status'); return; }
+  if(!confirm('Delete status "'+s.label+'"? Tasks with this status will be set to the first status.')) return;
+  // Reassign tasks
+  const fallback=TASK_STATUSES.find(x=>x.id!==id);
+  TASKS.forEach(t=>{ if(t.status===id){ t.status=fallback.id; t.done=fallback.done; }});
+  TASK_STATUSES=TASK_STATUSES.filter(x=>x.id!==id);
+  save(); renderAll(); renderTaskStatusList();
+  toast('🗑️ Status deleted');
+}
+
+function setPageSize(n,full=false){
+  odPageSize=n==='all'?'all':parseInt(n);
+  // update active state on both toolbars
+  ['ps-50','ps-100','ps-200','ps-all','sf-ps-50','sf-ps-100','sf-ps-200','sf-ps-all'].forEach(id=>{
+    const el=document.getElementById(id);
+    if(el) el.classList.toggle('active', String(el.dataset.ps)===String(n));
+  });
+  loadFolder(odPath[odPath.length-1].id,full);
+}
+
+function setView(v,full=false){
+  odView=v;
+  ['btn-grid','btn-list','sf-btn-grid','sf-btn-list'].forEach(id=>{const el=document.getElementById(id);if(el)el.classList.toggle('active',id.includes(v==='grid'?'grid':'list'));});
+  const q=document.getElementById(full?'sf-search':'od-search')?.value||'';
+  q.trim()?onSearch(q,full):loadFolder(odPath[odPath.length-1].id,full);
+}
+function setState(s){['connect','loading','error','ui'].forEach(k=>{document.getElementById('s-'+k).style.display=k===s?'flex':'none';});}
+function showSpinner(full=false){document.getElementById(full?'sf-files':'od-files').innerHTML=`<div class="od-loading-inline"><div class="spinner"></div><span>Loading…</span></div>`;}
+function setPill(on){const p=document.getElementById('od-pill');p.className=`status-pill ${on?'on':'off'}`;document.getElementById('od-pill-label').textContent=`OneDrive: ${on?'Active':'Disconnected'}`;}
+
+function fIcon(f){if(f.folder)return'📁';const e=(f.name.split('.').pop()||'').toLowerCase();return({pdf:'📋',docx:'📄',doc:'📄',xlsx:'📊',xls:'📊',pptx:'📑',ppt:'📑',zip:'🗜️',rar:'🗜️',png:'🖼️',jpg:'🖼️',jpeg:'🖼️',gif:'🖼️',mp4:'🎬',mov:'🎬',mp3:'🎵',txt:'📝',csv:'📊',json:'🔧',js:'🔧',ts:'🔧',html:'🌐',css:'🎨'}[e]||'📄');}
+function fSize(b){if(!b)return'–';if(b<1024)return b+'B';if(b<1048576)return(b/1024).toFixed(0)+'KB';if(b<1073741824)return(b/1048576).toFixed(1)+'MB';return(b/1073741824).toFixed(1)+'GB';}
+function fDate(s){if(!s)return'–';return new Date(s).toLocaleDateString('en-AU',{day:'numeric',month:'short'});}
+function esc(s){return s.replace(/'/g,"\\'").replace(/"/g,'&quot;');}
+
+let tTimer;
+function toast(msg){const e=document.getElementById('toast');e.textContent=msg;e.classList.add('show');clearTimeout(tTimer);tTimer=setTimeout(()=>e.classList.remove('show'),2800);}
+
+
+// ══════════════════════════════════════════════
+// PRICING DATABASE
+// ══════════════════════════════════════════════
+let PRICING_DB = {
+  margin: 30,
+  labourRate: 85,
+  odPath: '',
+  csvData: '',
+  items: []  // parsed rows
+};
+
+function loadPricingSettings(){
+  try{
+    const p = localStorage.getItem('pah_pricing_db');
+    if(p) PRICING_DB = {...PRICING_DB, ...JSON.parse(p)};
+  }catch(e){}
+}
+
+function savePricingDB(){
+  PRICING_DB.margin     = parseFloat(document.getElementById('pricing-margin')?.value) || 30;
+  PRICING_DB.labourRate = parseFloat(document.getElementById('pricing-labour-rate')?.value) || 85;
+  PRICING_DB.odPath     = document.getElementById('pricing-od-path')?.value.trim() || '';
+  PRICING_DB.csvData    = document.getElementById('pricing-csv')?.value.trim() || '';
+  PRICING_DB.items      = parsePricingCSV(PRICING_DB.csvData);
+  localStorage.setItem('pah_pricing_db', JSON.stringify(PRICING_DB));
+  renderPricingPreview();
+  saveToGitHub();
+  const st = document.getElementById('pricing-status');
+  if(st){ st.style.display='block'; st.style.color='var(--green)'; st.textContent='✅ Pricing database saved & synced!'; setTimeout(()=>st.style.display='none',3000); }
+}
+
+function parsePricingCSV(csv){
+  if(!csv) return [];
+  const lines = csv.trim().split('\n').filter(l=>l.trim() && !l.startsWith('SKU,'));
+  return lines.map(line=>{
+    const parts = line.split(',').map(p=>p.trim());
+    return {
+      sku:         parts[0]||'',
+      description: parts[1]||'',
+      unit:        parts[2]||'each',
+      bulkPrice:   parseFloat(parts[3])||0,
+      labourHours: parseFloat(parts[4])||0,
+      installCost: parseFloat(parts[5])||0,
+      margin:      parseFloat(parts[6])||PRICING_DB.margin||30
+    };
+  }).filter(r=>r.sku||r.description);
+}
+
+function renderPricingPreview(){
+  const body = document.getElementById('pricing-preview-body');
+  const preview = document.getElementById('pricing-db-preview');
+  const count = document.getElementById('pricing-row-count');
+  if(!body||!preview) return;
+  const items = PRICING_DB.items.length ? PRICING_DB.items : parsePricingCSV(document.getElementById('pricing-csv')?.value||'');
+  if(!items.length){ preview.style.display='none'; return; }
+  preview.style.display='block';
+  if(count) count.textContent = items.length;
+  body.innerHTML = items.map(i=>`
+    <tr>
+      <td class="sku">${i.sku}</td>
+      <td>${i.description}</td>
+      <td>${i.unit}</td>
+      <td>$${i.bulkPrice.toFixed(2)}</td>
+      <td>${i.labourHours}</td>
+      <td>$${i.installCost.toFixed(2)}</td>
+      <td>${i.margin}%</td>
+    </tr>`).join('');
+}
+
+function populatePricingSettings(){
+  const set = (id,val)=>{ const el=document.getElementById(id); if(el) el.value=val||''; };
+  set('pricing-margin',     PRICING_DB.margin);
+  set('pricing-labour-rate',PRICING_DB.labourRate);
+  set('pricing-od-path',    PRICING_DB.odPath);
+  set('pricing-csv',        PRICING_DB.csvData);
+  renderPricingPreview();
+}
+
+async function loadPricingFromOneDrive(){
+  if(!token){ toast('⚠️ Connect OneDrive first'); return; }
+  const path = document.getElementById('pricing-od-path')?.value.trim();
+  if(!path){ toast('⚠️ Enter an OneDrive file path first'); return; }
+  const st = document.getElementById('pricing-status');
+  if(st){ st.style.display='block'; st.style.color='var(--text-dim)'; st.textContent='Loading from OneDrive…'; }
+  try{
+    // search by path in OneDrive
+    const encoded = encodeURIComponent(path.replace(/^\//, ''));
+    const r = await gGet('https://graph.microsoft.com/v1.0/me/drive/root:/' + encoded + ':/content');
+    const text = await r.text();
+    document.getElementById('pricing-csv').value = text;
+    PRICING_DB.csvData = text;
+    PRICING_DB.items = parsePricingCSV(text);
+    renderPricingPreview();
+    if(st){ st.style.color='var(--green)'; st.textContent='✅ Loaded ' + PRICING_DB.items.length + ' items from OneDrive!'; }
+    toast('✅ Pricing loaded from OneDrive');
+  }catch(e){
+    if(st){ st.style.color='var(--red)'; st.textContent='❌ Could not load: ' + e.message; }
+    toast('❌ OneDrive load failed: ' + e.message);
+  }
+}
+
+// ══════════════════════════════════════════════
+// ESTIMATOR ENGINE
+// ══════════════════════════════════════════════
+let currentEstimate = null;
+let estFileData = null;
+let estFileType = null;
+
+function handleEstDrop(e){
+  e.preventDefault();
+  document.getElementById('est-drop-zone').classList.remove('drag');
+  const file = e.dataTransfer.files[0];
+  if(file) handleEstFile(file);
+}
+
+function handleEstFile(file){
+  if(!file) return;
+  const isPDF = file.type === 'application/pdf' || file.name.toLowerCase().endsWith('.pdf');
+  estFileType = isPDF ? 'pdf' : 'image';
+  // store actual mime type for API call
+  window._estMimeType = isPDF ? 'application/pdf' : (file.type || 'image/jpeg');
+  const reader = new FileReader();
+  reader.onload = e => {
+    estFileData = e.target.result.split(',')[1]; // base64
+    const preview = document.getElementById('est-preview');
+    if(!isPDF && preview){
+      preview.src = e.target.result;
+      preview.style.display = 'block';
+    } else if(preview){
+      preview.style.display = 'none';
+    }
+    const txt = document.getElementById('est-upload-text');
+    if(txt) txt.innerHTML = '<strong>✅ ' + file.name + '</strong><br><span style="color:var(--green)">Ready to analyse — ' + (isPDF ? 'PDF' : 'Image') + '</span>';
+    toast('✅ File loaded: ' + file.name);
+  };
+  reader.onerror = () => toast('❌ Could not read file');
+  reader.readAsDataURL(file);
+}
+
+function setEstStatus(text, show=true){
+  const el = document.getElementById('est-status');
+  const txt = document.getElementById('est-status-text');
+  if(el) el.style.display = show ? 'flex' : 'none';
+  if(txt) txt.textContent = text;
+}
+
+async function runEstimator(){
+  const client  = document.getElementById('est-client')?.value.trim();
+  const address = document.getElementById('est-address')?.value.trim();
+  const type    = document.getElementById('est-type')?.value;
+  const notes   = document.getElementById('est-notes-input')?.value.trim();
+
+  if(!client){ toast('⚠️ Please enter client name'); return; }
+  if(!estFileData){ toast('⚠️ Please upload a PDF or image first'); return; }
+
+  // Set today's date if empty
+  const dateEl = document.getElementById('est-date');
+  if(dateEl && !dateEl.value) dateEl.value = new Date().toISOString().split('T')[0];
+
+  const btn = document.getElementById('est-run-btn');
+  if(btn){ btn.disabled=true; btn.textContent='Analysing…'; }
+  document.getElementById('est-result').style.display = 'none';
+  document.getElementById('est-pdf-btn').style.display = 'none';
+  setEstStatus('Analysing document with AI…');
+
+  // build pricing context for AI
+  const pricingContext = PRICING_DB.items.length
+    ? 'PRICING DATABASE (use these for matching):\n' + 
+      'SKU | Description | Unit | BulkPrice | LabourHours | InstallCost | Margin%\n' +
+      PRICING_DB.items.map(i=>`${i.sku} | ${i.description} | ${i.unit} | $${i.bulkPrice} | ${i.labourHours}hrs | $${i.installCost} | ${i.margin}%`).join('\n')
+    : 'No pricing database loaded. Use reasonable Australian market rates for cabinet/joinery work.';
+
+  const prompt = `You are an expert cabinet maker and joinery estimator in Australia. Analyse the uploaded ${estFileType === 'pdf' ? 'PDF document' : 'image'} for a ${type} project.
+
+Client: ${client}
+Address: ${address || 'Not specified'}
+Project Type: ${type}
+${notes ? 'Additional Notes: ' + notes : ''}
+
+${pricingContext}
+
+Default labour rate: AUD $${PRICING_DB.labourRate}/hr
+Default margin: ${PRICING_DB.margin}%
+
+Based on the uploaded file, provide a detailed estimate in this EXACT JSON format (no markdown, no extra text):
+{
+  "scope": "2-3 sentence summary of the scope of work",
+  "materials": [
+    {"sku": "SKU or empty", "description": "item name", "qty": 1, "unit": "each", "unitPrice": 0, "total": 0}
+  ],
+  "labour": [
+    {"task": "task name", "hours": 0, "rate": ${PRICING_DB.labourRate}, "total": 0}
+  ],
+  "subtotalMaterials": 0,
+  "subtotalLabour": 0,
+  "marginRate": ${PRICING_DB.margin},
+  "marginAmount": 0,
+  "grandTotal": 0
+}
+
+Rules:
+- Match items to the pricing database by description keywords
+- Use bulk prices from the database, not retail prices
+- Apply margin to the GRAND TOTAL only (do not show per-line)
+- grandTotal = (subtotalMaterials + subtotalLabour) * (1 + marginRate/100)
+- All prices in AUD
+- Be realistic and thorough — don't miss obvious items`;
+
+  try{
+    setEstStatus('AI is reading the document…');
+    
+    // Build messages with file attachment
+    const content = [
+      { type: 'text', text: prompt }
+    ];
+    
+    if(estFileType === 'image'){
+      const mimeType = window._estMimeType || 'image/jpeg';
+      // Claude supports image/jpeg, image/png, image/gif, image/webp
+      // convert unsupported types to jpeg label (data is still valid)
+      const supportedMime = ['image/jpeg','image/png','image/gif','image/webp'].includes(mimeType) ? mimeType : 'image/jpeg';
+      content.unshift({ 
+        type: 'image', 
+        source: { type: 'base64', media_type: supportedMime, data: estFileData }
+      });
+    } else {
+      content.unshift({
+        type: 'document',
+        source: { type: 'base64', media_type: 'application/pdf', data: estFileData }
+      });
+    }
+
+    setEstStatus('Generating itemised estimate…');
+    
+    const apiKey = await getAnthropicKey();
+    if(!apiKey){ throw new Error('Could not decrypt API key.'); }
+
+    const ANTHROPIC_URL = 'https://api.anthropic.com/v1/messages';
+    const requestBody = {
+      model: 'claude-opus-4-5',
+      max_tokens: 4000,
+      messages: [{ role: 'user', content }]
+    };
+    const headers = {
+      'Content-Type': 'application/json',
+      'x-api-key': apiKey,
+      'anthropic-version': '2023-06-01',
+      'anthropic-dangerous-allow-browser': 'true'
+    };
+
+    setEstStatus('Sending to AI… (this may take 15-30 seconds)');
+
+    // Try direct first, then fall back through proxies
+    const proxies = [
+      ANTHROPIC_URL,
+      'https://api.allorigins.win/raw?url=' + encodeURIComponent(ANTHROPIC_URL),
+      'https://corsproxy.io/?' + encodeURIComponent(ANTHROPIC_URL),
+    ];
+
+    let resp = null;
+    let lastErr = '';
+    for(const url of proxies){
+      try{
+        resp = await fetch(url, { method:'POST', headers, body: JSON.stringify(requestBody) });
+        if(resp.ok) break;
+        lastErr = 'HTTP ' + resp.status;
+        resp = null;
+      }catch(e){
+        lastErr = e.message;
+        resp = null;
+      }
+    }
+    if(!resp) throw new Error('All endpoints failed. Last error: ' + lastErr + '. Please upload to GitHub Pages to use this feature.');
+
+    if(!resp.ok){
+      const errBody = await resp.text();
+      throw new Error('API error ' + resp.status + ': ' + errBody.slice(0,200));
+    }
+    const data = await resp.json();
+    const text = data.content?.find(b=>b.type==='text')?.text || '';
+    if(!text) throw new Error('Empty response from AI');
+    
+    // parse JSON from response
+    const jsonMatch = text.match(/\{[\s\S]*\}/);
+    if(!jsonMatch) throw new Error('AI returned unexpected format');
+    
+    currentEstimate = JSON.parse(jsonMatch[0]);
+    currentEstimate.client  = client;
+    currentEstimate.address = address;
+    currentEstimate.type    = type;
+    currentEstimate.date    = dateEl?.value || new Date().toISOString().split('T')[0];
+    
+    renderEstimate(currentEstimate);
+    setEstStatus('', false);
+    document.getElementById('est-result').style.display = 'block';
+    document.getElementById('est-pdf-btn').style.display = 'inline-flex';
+    toast('✅ Estimate generated!');
+    
+  }catch(e){
+    const errMsg = e.message || 'Unknown error';
+    setEstStatus('❌ ' + errMsg);
+    console.error('Estimator error:', e);
+    // show full error on screen so user can report it
+    setEstStatus('❌ ' + errMsg);
+    toast('❌ ' + errMsg.slice(0,80));
+  }finally{
+    if(btn){ btn.disabled=false; btn.textContent='🤖 Generate Estimate'; }
+  }
+}
+
+function renderEstimate(est){
+  // scope
+  document.getElementById('est-scope-text').textContent = est.scope || '';
+  
+  // materials
+  const mb = document.getElementById('est-materials-body');
+  if(mb) mb.innerHTML = (est.materials||[]).map(r=>`
+    <tr>
+      <td>${r.description}</td>
+      <td class="sku">${r.sku||'—'}</td>
+      <td>${r.qty}</td>
+      <td>${r.unit}</td>
+      <td>$${parseFloat(r.unitPrice||0).toFixed(2)}</td>
+      <td><strong>$${parseFloat(r.total||0).toFixed(2)}</strong></td>
+    </tr>`).join('') + `
+    <tr class="est-total-row">
+      <td colspan="5">Materials Subtotal</td>
+      <td><strong>$${parseFloat(est.subtotalMaterials||0).toFixed(2)}</strong></td>
+    </tr>`;
+
+  // labour
+  const lb = document.getElementById('est-labour-body');
+  if(lb) lb.innerHTML = (est.labour||[]).map(r=>`
+    <tr>
+      <td>${r.task}</td>
+      <td>${r.hours} hrs</td>
+      <td>$${parseFloat(r.rate||0).toFixed(2)}/hr</td>
+      <td><strong>$${parseFloat(r.total||0).toFixed(2)}</strong></td>
+    </tr>`).join('') + `
+    <tr class="est-total-row">
+      <td colspan="3">Labour Subtotal</td>
+      <td><strong>$${parseFloat(est.subtotalLabour||0).toFixed(2)}</strong></td>
+    </tr>`;
+
+  // grand total
+  const margin = est.marginRate || PRICING_DB.margin || 30;
+  document.getElementById('est-margin-label').textContent = margin + '% margin applied';
+  document.getElementById('est-total').textContent = 'AUD $' + parseFloat(est.grandTotal||0).toLocaleString('en-AU', {minimumFractionDigits:2, maximumFractionDigits:2});
+}
+
+function clearEstimate(){
+  currentEstimate = null; estFileData = null; estFileType = null;
+  document.getElementById('est-result').style.display = 'none';
+  document.getElementById('est-pdf-btn').style.display = 'none';
+  document.getElementById('est-status').style.display = 'none';
+  document.getElementById('est-client').value = '';
+  document.getElementById('est-address').value = '';
+  document.getElementById('est-notes-input').value = '';
+  document.getElementById('est-date').value = '';
+  document.getElementById('est-preview').style.display = 'none';
+  const txt = document.getElementById('est-upload-text');
+  if(txt) txt.innerHTML = '<strong>Tap to upload or drag & drop</strong><br>PDF, JPG, PNG, HEIC — floor plans, sketches, scope documents';
+  document.getElementById('est-file-input').value = '';
+}
+
+async function downloadEstimatePDF(){
+  if(!currentEstimate){ toast('No estimate to download'); return; }
+  const btn = document.getElementById('est-pdf-btn');
+  if(btn){ btn.disabled=true; btn.textContent='Generating PDF…'; }
+  
+  try{
+    // Build HTML for PDF
+    const margin = currentEstimate.marginRate || PRICING_DB.margin || 30;
+    const matRows = (currentEstimate.materials||[]).map(r=>
+      `<tr><td>${r.description}</td><td style="color:#666;font-size:11px">${r.sku||'—'}</td><td style="text-align:center">${r.qty}</td><td style="text-align:center">${r.unit}</td><td style="text-align:right">$${parseFloat(r.unitPrice||0).toFixed(2)}</td><td style="text-align:right"><strong>$${parseFloat(r.total||0).toFixed(2)}</strong></td></tr>`
+    ).join('');
+    const labRows = (currentEstimate.labour||[]).map(r=>
+      `<tr><td>${r.task}</td><td style="text-align:center">${r.hours} hrs</td><td style="text-align:right">$${parseFloat(r.rate||0).toFixed(2)}/hr</td><td style="text-align:right"><strong>$${parseFloat(r.total||0).toFixed(2)}</strong></td></tr>`
+    ).join('');
+
+    const html = `<!DOCTYPE html><html><head><meta charset="UTF-8"/>
+<style>
+  body{font-family:Arial,sans-serif;font-size:13px;color:#222;padding:40px;max-width:800px;margin:0 auto}
+  h1{color:#1a237e;font-size:22px;margin-bottom:4px}
+  .subtitle{color:#666;font-size:13px;margin-bottom:24px}
+  .header{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:32px;padding-bottom:16px;border-bottom:2px solid #1a237e}
+  .company{font-size:11px;color:#666;text-align:right}
+  .info-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:24px;background:#f8f9fa;padding:14px;border-radius:6px}
+  .info-item label{font-size:11px;color:#999;display:block;margin-bottom:2px}
+  .info-item span{font-weight:600}
+  h3{color:#1a237e;font-size:13px;letter-spacing:0.5px;text-transform:uppercase;margin:20px 0 8px;padding-bottom:4px;border-bottom:1px solid #e0e0e0}
+  .scope{background:#f8f9fa;padding:12px;border-radius:6px;color:#444;line-height:1.7;margin-bottom:20px;font-size:12px}
+  table{width:100%;border-collapse:collapse;margin-bottom:8px}
+  th{background:#1a237e;color:#fff;padding:7px 10px;text-align:left;font-size:11px}
+  td{padding:7px 10px;border-bottom:1px solid #eee;font-size:12px}
+  tr:nth-child(even) td{background:#fafafa}
+  .subtotal td{font-weight:700;border-top:2px solid #ddd;background:#f0f4ff!important}
+  .grand-total{margin-top:24px;padding:16px 20px;background:#1a237e;border-radius:8px;display:flex;justify-content:space-between;align-items:center;color:#fff}
+  .grand-total-label{font-size:13px;opacity:0.85}
+  .grand-total-val{font-size:22px;font-weight:700}
+  .footer{margin-top:40px;font-size:10px;color:#999;text-align:center;border-top:1px solid #eee;padding-top:12px}
+</style></head><body>
+<div class="header">
+  <div><h1>VIP Cabinets — Estimate</h1><div class="subtitle">${currentEstimate.type}</div></div>
+  <div class="company">PAH Admin Panel<br>${currentEstimate.date}</div>
+</div>
+<div class="info-grid">
+  <div class="info-item"><label>Client</label><span>${currentEstimate.client}</span></div>
+  <div class="info-item"><label>Address</label><span>${currentEstimate.address||'—'}</span></div>
+  <div class="info-item"><label>Project Type</label><span>${currentEstimate.type}</span></div>
+  <div class="info-item"><label>Estimate Date</label><span>${currentEstimate.date}</span></div>
+</div>
+<h3>Scope of Work</h3>
+<div class="scope">${currentEstimate.scope||''}</div>
+<h3>Materials</h3>
+<table><thead><tr><th>Item</th><th>SKU</th><th>Qty</th><th>Unit</th><th>Unit Price</th><th>Total</th></tr></thead>
+<tbody>${matRows}<tr class="subtotal"><td colspan="5">Materials Subtotal</td><td style="text-align:right">$${parseFloat(currentEstimate.subtotalMaterials||0).toFixed(2)}</td></tr></tbody></table>
+<h3>Labour</h3>
+<table><thead><tr><th>Task</th><th>Hours</th><th>Rate</th><th>Total</th></tr></thead>
+<tbody>${labRows}<tr class="subtotal"><td colspan="3">Labour Subtotal</td><td style="text-align:right">$${parseFloat(currentEstimate.subtotalLabour||0).toFixed(2)}</td></tr></tbody></table>
+<div class="grand-total">
+  <div class="grand-total-label">Total Estimate (incl. ${margin}% margin)<br><span style="font-size:10px;opacity:0.6">Materials + Labour + Margin</span></div>
+  <div class="grand-total-val">AUD $${parseFloat(currentEstimate.grandTotal||0).toLocaleString('en-AU',{minimumFractionDigits:2})}</div>
+</div>
+<div class="footer">This estimate is valid for 30 days. Prices include ${margin}% margin. All prices in AUD. Generated by PAH Admin Panel.</div>
+</body></html>`;
+
+    // open in new window and print to PDF
+    const w = window.open('', '_blank');
+    w.document.write(html);
+    w.document.close();
+    setTimeout(()=>{ w.print(); }, 500);
+    
+  }catch(e){
+    toast('❌ PDF failed: ' + e.message);
+  }finally{
+    if(btn){ btn.disabled=false; btn.textContent='⬇️ Download PDF'; }
+  }
+}
+
+
+</script>
