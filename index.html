@@ -1243,6 +1243,7 @@ async function doLogin(){
   // pre-cache api keys
   getAnthropicKey();
   getGeminiKey();
+  getGeminiKey2();
 
   showApp(user);
   updateGhTokenUI();
@@ -1579,7 +1580,8 @@ async function changeMyPassword(){
 
 const ENCRYPTED_TOKEN = {"salt": "6TSXf13ZpQ5pOSINzIb7yw==", "iv": "PrdkkIu7kvWC8HNl", "data": "PtTsgVIviqm2Iyy5fHQM+L9ha86qEezz8uTAqxamSys4I22yMSbfmORpJ55wn2EZ1uzh4kKIZKg="};
 const ENCRYPTED_ANTHROPIC = {"salt": "8RH+eEDxgr4rBiHn0sQAwQ==", "iv": "h2iBTiUB3ZbWwYYh", "data": "IFkLEI19k5zAEywPr1xi05AEGXd72wjJPKhQZCVDHWCJ1MGmKzGvR2cf4q2wtZmRvBfbHxLdIUW8evStJdkWNYiCDJ7XdiOu5p0/HXDcLTRwc4gYPIGGJFKcueG31vqD6qkWQoEPQ8rkq6SGZ8/rS2HQRBt41b+4jzbNyA=="};
-const ENCRYPTED_GEMINI = {"salt": "jj/dQ4JXYazz/Ne+70xeBw==", "iv": "mjQbSyS54K7P/C2R", "data": "tJFq6dOfBWjBYEpjc0g1HJTRM2Qo8iiiUumuKD0A29yO4YJibcOD9pOIUB8p9j6/9CVWtF+9/w=="};
+const ENCRYPTED_GEMINI  = {"salt": "jj/dQ4JXYazz/Ne+70xeBw==", "iv": "mjQbSyS54K7P/C2R", "data": "tJFq6dOfBWjBYEpjc0g1HJTRM2Qo8iiiUumuKD0A29yO4YJibcOD9pOIUB8p9j6/9CVWtF+9/w=="};
+const ENCRYPTED_GEMINI2 = {"salt": "6CIGm7/G0RjRKzhsPVA2JA==", "iv": "IJC5WDImR6kEpqwF", "data": "Tfktj5fOgkXwPFwPE5G6gPKz2fTDWkj9M/77gu0thZk33sc0FAq5GQoT8Ju6WS9A0rpaGfeXEQ=="};
 
 async function deriveKey(password, saltB64){
   const enc = new TextEncoder();
@@ -1632,6 +1634,20 @@ async function getGeminiKey(){
     const decrypted = await crypto.subtle.decrypt({name:'AES-GCM', iv}, key, data);
     const apiKey = new TextDecoder().decode(decrypted);
     sessionStorage.setItem('pah_gemini_key', apiKey);
+    return apiKey;
+  }catch(e){ return null; }
+}
+
+async function getGeminiKey2(){
+  const cached = sessionStorage.getItem('pah_gemini_key2');
+  if(cached) return cached;
+  try{
+    const key = await deriveKey('Admin_vipcabinets', ENCRYPTED_GEMINI2.salt);
+    const iv = Uint8Array.from(atob(ENCRYPTED_GEMINI2.iv), c=>c.charCodeAt(0));
+    const data = Uint8Array.from(atob(ENCRYPTED_GEMINI2.data), c=>c.charCodeAt(0));
+    const decrypted = await crypto.subtle.decrypt({name:'AES-GCM',iv},key,data);
+    const apiKey = new TextDecoder().decode(decrypted);
+    sessionStorage.setItem('pah_gemini_key2', apiKey);
     return apiKey;
   }catch(e){ return null; }
 }
@@ -3251,9 +3267,6 @@ Rules:
 
     setEstStatus('Sending to AI… this may take 20-30 seconds');
 
-    const geminiKey = await getGeminiKey();
-    if(!geminiKey) throw new Error('Could not decrypt Gemini key.');
-
     // Build Gemini request
     const parts = [];
     if(estFileType === 'image'){
@@ -3269,15 +3282,22 @@ Rules:
       generationConfig: { maxOutputTokens: 4000, temperature: 0.2 }
     };
 
-    const GEMINI_URL = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=' + geminiKey;
+    const BASE = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=';
+    const key1 = await getGeminiKey();
+    const key2 = await getGeminiKey2();
+    if(!key1 && !key2) throw new Error('Could not decrypt Gemini keys.');
 
     let resp;
     try{
-      resp = await fetch(GEMINI_URL, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(geminiBody)
-      });
+      if(key1){
+        resp = await fetch(BASE + key1, { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(geminiBody) });
+        if(resp.status === 429 && key2){
+          setEstStatus('Rate limit hit — trying backup key…');
+          resp = await fetch(BASE + key2, { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(geminiBody) });
+        }
+      } else {
+        resp = await fetch(BASE + key2, { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(geminiBody) });
+      }
     }catch(e){
       throw new Error('Network error: ' + e.message);
     }
