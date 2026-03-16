@@ -1,80 +1,23 @@
 {
-  "tasks": [
-    {
-      "id": 1,
-      "name": "Review Q1 budget report",
-      "done": true,
-      "pri": "h",
-      "due": "2026-03-09"
-    },
-    {
-      "id": 2,
-      "name": "Send stakeholder update",
-      "done": false,
-      "pri": "h",
-      "due": "2026-03-09"
-    },
-    {
-      "id": 3,
-      "name": "Update project timeline",
-      "done": false,
-      "pri": "m",
-      "due": "2026-03-10"
-    },
-    {
-      "id": 4,
-      "name": "Schedule team stand-up",
-      "done": true,
-      "pri": "l",
-      "due": "2026-03-09"
-    },
-    {
-      "id": 5,
-      "name": "Prepare compliance checklist",
-      "done": false,
-      "pri": "m",
-      "due": "2026-03-11"
-    },
-    {
-      "id": 6,
-      "name": "Archive sprint files",
-      "done": false,
-      "pri": "l",
-      "due": "2026-03-12"
-    }
-  ],
+  "tasks": [],
   "projects": [
     {
       "id": 1,
       "name": "PAH Web v1.1",
       "desc": "Admin panel upgrade",
       "progress": 78,
-      "status": "on-track",
-      "due": "2026-03-20"
-    },
-    {
-      "id": 2,
-      "name": "Client Portal",
-      "desc": "External client access",
-      "progress": 45,
-      "status": "at-risk",
-      "due": "2026-03-15"
-    },
-    {
-      "id": 3,
-      "name": "Data Migration",
-      "desc": "Legacy system transfer",
-      "progress": 60,
       "status": "in-progress",
-      "due": "2026-04-01"
+      "due": "2026-03-16",
+      "odFolderId": null
     },
     {
       "id": 4,
       "name": "Compliance Audit",
       "desc": "Annual review prep",
-      "progress": 30,
-      "status": "overdue",
-      "due": "2026-03-05"
+      "progress": 100,
+      "status": "in-progress",
+      "due": "2026-03-16",
+      "odFolderId": null
     }
   ],
   "team": [
@@ -83,21 +26,16 @@
       "name": "Payam Mirzapanah",
       "role": "Project Manager",
       "status": "online",
-      "color": "#1565c0"
+      "color": "#1565c0",
+      "phone": "0403741854"
     },
     {
       "id": 2,
       "name": "Shahram ES`haghi",
       "role": "Manager",
       "status": "online",
-      "color": "#2e7d32"
-    },
-    {
-      "id": 3,
-      "name": "Clara Lee",
-      "role": "Designer",
-      "status": "away",
-      "color": "#e65100"
+      "color": "#2e7d32",
+      "phone": "0451147742"
     }
   ],
   "taskStatuses": [
@@ -131,14 +69,33 @@
       "username": "VIP-Cabinets",
       "passwordHash": "e19bd725e77c0e7bf56670376ddb2d90c32886a6d43bcb016387a9885c638e53",
       "role": "admin",
-      "builtIn": true
+      "builtIn": true,
+      "displayName": "Pooya",
+      "email": "p.mirzapanah@gmail.com"
+    },
+    {
+      "username": "Shahram_vip",
+      "passwordHash": "8d969eef6ecad3c29a3a629280e686cf0c3f5d5a86aff3ca12020c923adc6c92",
+      "role": "manager",
+      "displayName": "Shahram_vip"
+    },
+    {
+      "username": "Payam_vip",
+      "passwordHash": "8d969eef6ecad3c29a3a629280e686cf0c3f5d5a86aff3ca12020c923adc6c92",
+      "role": "admin",
+      "displayName": "Payam_vip"
+    },
+    {
+      "username": "pooya",
+      "passwordHash": "8d969eef6ecad3c29a3a629280e686cf0c3f5d5a86aff3ca12020c923adc6c92",
+      "role": "admin"
     }
   ],
   "notifConfig": {
     "ejsPublicKey": "_jGG32y7F5ImwYr1m",
     "ejsServiceId": "VIP Due date reminder",
     "ejsTemplateId": "Due date approaching",
-    "toEmail": "",
+    "toEmail": "p.mirzapanah@gmail.com",
     "toSms": "0403741854@voda.net.au"
   },
   "notifPrefs": {
@@ -150,12 +107,5 @@
   "reminderIntervals": [
     1
   ],
-  "pricingDB": {
-    "margin": 30,
-    "labourRate": 85,
-    "odPath": "C:\\Users\\Paul\\OneDrive\\Jobs\\0 CRM Test\\VIP_Cabinets_Pricing.xlsx",
-    "csvData": "",
-    "items": []
-  },
-  "savedAt": "2026-03-16T19:25:46.031Z"
+  "savedAt": "2026-03-15T20:29:36.415Z"
 }
