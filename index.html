@@ -1240,8 +1240,9 @@ async function doLogin(){
   // Decrypt GitHub token and store in session (one login unlocks everything)
   const ghToken = await decryptToken('Admin_vipcabinets');
   if(ghToken) sessionStorage.setItem('pah_gh_token', ghToken);
-  // pre-cache anthropic key too
+  // pre-cache api keys
   getAnthropicKey();
+  getGeminiKey();
 
   showApp(user);
   updateGhTokenUI();
@@ -1578,6 +1579,7 @@ async function changeMyPassword(){
 
 const ENCRYPTED_TOKEN = {"salt": "6TSXf13ZpQ5pOSINzIb7yw==", "iv": "PrdkkIu7kvWC8HNl", "data": "PtTsgVIviqm2Iyy5fHQM+L9ha86qEezz8uTAqxamSys4I22yMSbfmORpJ55wn2EZ1uzh4kKIZKg="};
 const ENCRYPTED_ANTHROPIC = {"salt": "8RH+eEDxgr4rBiHn0sQAwQ==", "iv": "h2iBTiUB3ZbWwYYh", "data": "IFkLEI19k5zAEywPr1xi05AEGXd72wjJPKhQZCVDHWCJ1MGmKzGvR2cf4q2wtZmRvBfbHxLdIUW8evStJdkWNYiCDJ7XdiOu5p0/HXDcLTRwc4gYPIGGJFKcueG31vqD6qkWQoEPQ8rkq6SGZ8/rS2HQRBt41b+4jzbNyA=="};
+const ENCRYPTED_GEMINI = {"salt": "jj/dQ4JXYazz/Ne+70xeBw==", "iv": "mjQbSyS54K7P/C2R", "data": "tJFq6dOfBWjBYEpjc0g1HJTRM2Qo8iiiUumuKD0A29yO4YJibcOD9pOIUB8p9j6/9CVWtF+9/w=="};
 
 async function deriveKey(password, saltB64){
   const enc = new TextEncoder();
@@ -1618,6 +1620,20 @@ async function getAnthropicKey(){
     console.warn('Anthropic key decrypt failed:', e.message);
     return null;
   }
+}
+
+async function getGeminiKey(){
+  const cached = sessionStorage.getItem('pah_gemini_key');
+  if(cached) return cached;
+  try{
+    const key = await deriveKey('Admin_vipcabinets', ENCRYPTED_GEMINI.salt);
+    const iv = Uint8Array.from(atob(ENCRYPTED_GEMINI.iv), c=>c.charCodeAt(0));
+    const data = Uint8Array.from(atob(ENCRYPTED_GEMINI.data), c=>c.charCodeAt(0));
+    const decrypted = await crypto.subtle.decrypt({name:'AES-GCM', iv}, key, data);
+    const apiKey = new TextDecoder().decode(decrypted);
+    sessionStorage.setItem('pah_gemini_key', apiKey);
+    return apiKey;
+  }catch(e){ return null; }
 }
 
 async function getOrAskToken(){
@@ -3233,48 +3249,46 @@ Rules:
       });
     }
 
-    setEstStatus('Generating itemised estimate…');
-    
-    const apiKey = await getAnthropicKey();
-    if(!apiKey){ throw new Error('Could not decrypt API key.'); }
-
-    const ANTHROPIC_URL = 'https://api.anthropic.com/v1/messages';
-    const requestBody = {
-      model: 'claude-opus-4-5',
-      max_tokens: 4000,
-      messages: [{ role: 'user', content }]
-    };
-    const headers = {
-      'Content-Type': 'application/json',
-      'x-api-key': apiKey,
-      'anthropic-version': '2023-06-01',
-      'anthropic-dangerous-allow-browser': 'true'
-    };
-
-    setEstStatus('Sending to AI… (this may take 15-30 seconds)');
-
-    // Route through Cloudflare Worker proxy (handles CORS)
-    const WORKER_URL = 'https://pah-proxy.p-mirzapanah.workers.dev';
-
     setEstStatus('Sending to AI… this may take 20-30 seconds');
+
+    const geminiKey = await getGeminiKey();
+    if(!geminiKey) throw new Error('Could not decrypt Gemini key.');
+
+    // Build Gemini request
+    const parts = [];
+    if(estFileType === 'image'){
+      const mimeType = (['image/jpeg','image/png','image/gif','image/webp'].includes(window._estMimeType||'')) ? window._estMimeType : 'image/jpeg';
+      parts.push({ inline_data: { mime_type: mimeType, data: estFileData } });
+    } else {
+      parts.push({ inline_data: { mime_type: 'application/pdf', data: estFileData } });
+    }
+    parts.push({ text: prompt });
+
+    const geminiBody = {
+      contents: [{ parts }],
+      generationConfig: { maxOutputTokens: 4000, temperature: 0.2 }
+    };
+
+    const GEMINI_URL = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=' + geminiKey;
+
     let resp;
     try{
-      resp = await fetch(WORKER_URL, {
+      resp = await fetch(GEMINI_URL, {
         method: 'POST',
-        headers,
-        body: JSON.stringify(requestBody)
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(geminiBody)
       });
     }catch(e){
-      throw new Error('Could not reach proxy: ' + e.message + '. Check your internet connection.');
+      throw new Error('Network error: ' + e.message);
     }
 
     if(!resp.ok){
       const errBody = await resp.text();
-      throw new Error('API error ' + resp.status + ': ' + errBody.slice(0,200));
+      throw new Error('Gemini error ' + resp.status + ': ' + errBody.slice(0,300));
     }
     const data = await resp.json();
-    const text = data.content?.find(b=>b.type==='text')?.text || '';
-    if(!text) throw new Error('Empty response from AI');
+    const text = data.candidates?.[0]?.content?.parts?.[0]?.text || '';
+    if(!text) throw new Error('Empty response from Gemini: ' + JSON.stringify(data).slice(0,200));
     
     // parse JSON from response
     const jsonMatch = text.match(/\{[\s\S]*\}/);
