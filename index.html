@@ -517,6 +517,20 @@ body::before{content:'';position:fixed;inset:0;background:repeating-linear-gradi
 }
 
 /* estimator page */
+.est-item{background:var(--surface);border:1px solid var(--border2);border-radius:12px;margin-bottom:16px;overflow:hidden}
+.est-item-header{display:flex;align-items:center;justify-content:space-between;padding:12px 16px;background:var(--surface2);border-bottom:1px solid var(--border2);cursor:pointer}
+.est-item-header-left{display:flex;align-items:center;gap:10px}
+.est-item-num{width:24px;height:24px;border-radius:50%;background:var(--blue);color:#fff;font-size:0.75rem;font-weight:700;display:grid;place-items:center;flex-shrink:0}
+.est-item-title{font-size:0.88rem;font-weight:600}
+.est-item-subtitle{font-size:0.72rem;color:var(--text-dim);margin-top:1px}
+.est-item-total-badge{font-size:0.78rem;font-weight:700;color:var(--green);background:rgba(63,185,80,0.1);border:1px solid rgba(63,185,80,0.3);padding:3px 10px;border-radius:12px}
+.est-item-body{padding:16px}
+.est-item-body.collapsed{display:none}
+.est-item-actions{display:flex;align-items:center;gap:8px}
+.est-summary-row{display:flex;justify-content:space-between;align-items:center;padding:8px 16px;border-bottom:1px solid var(--border2);font-size:0.84rem}
+.est-summary-row:last-child{border-bottom:none}
+.est-summary-row-label{color:var(--text-dim)}
+.est-summary-row-val{font-weight:600}
 .est-upload-zone{border:2px dashed var(--border);border-radius:12px;padding:40px;text-align:center;cursor:pointer;transition:all 0.2s;background:var(--surface);position:relative;overflow:hidden}
 .est-upload-zone:hover,.est-upload-zone.drag{border-color:var(--blue);background:var(--blue-dim)}
 .est-upload-icon{font-size:2.5rem;margin-bottom:10px}
@@ -806,115 +820,36 @@ body::before{content:'';position:fixed;inset:0;background:repeating-linear-gradi
               <input class="modal-input" id="est-client" placeholder="e.g. John Smith"/></div>
             <div><label style="font-size:0.78rem;color:var(--text-dim);display:block;margin-bottom:4px">Project Address</label>
               <input class="modal-input" id="est-address" placeholder="e.g. 12 Main St, Brisbane QLD"/></div>
-            <div><label style="font-size:0.78rem;color:var(--text-dim);display:block;margin-bottom:4px">Project Type</label>
-              <select class="modal-input" id="est-type">
-                <option>Kitchen Cabinets</option>
-                <option>Bathroom Vanity</option>
-                <option>Laundry Joinery</option>
-                <option>Wardrobe / Robe</option>
-                <option>Custom Joinery</option>
-                <option>Full Renovation</option>
-              </select></div>
             <div><label style="font-size:0.78rem;color:var(--text-dim);display:block;margin-bottom:4px">Estimate Date</label>
               <input class="modal-input" type="date" id="est-date"/></div>
           </div>
         </div>
 
-        <!-- upload zone -->
-        <div class="est-section">
-          <div class="est-section-title">Upload Plans / Scope / Image</div>
-          <div id="est-drop-zone" style="border:2px dashed var(--border);border-radius:12px;padding:30px;text-align:center;background:var(--surface);margin-bottom:4px"
-               ondragover="event.preventDefault();this.style.borderColor='var(--blue)'"
-               ondragleave="this.style.borderColor='var(--border)'"
-               ondrop="handleEstDrop(event)">
-            <div style="font-size:2.2rem;margin-bottom:8px">📄</div>
-            <div id="est-upload-text" style="font-size:0.85rem;color:var(--text-dim);margin-bottom:14px">
-              <strong style="color:var(--text)">Select a file below</strong><br>
-              PDF, JPG, PNG, HEIC — floor plans, sketches, scope documents
+        <!-- estimate items container -->
+        <div id="est-items-container"></div>
+
+        <!-- add item button -->
+        <button class="btn btn-ghost" onclick="addEstimateItem()" style="width:100%;margin-bottom:20px;border-style:dashed">
+          ＋ Add Another Area / Room
+        </button>
+
+        <!-- combined total -->
+        <div id="est-combined-total" style="display:none">
+          <div style="background:var(--surface);border:1px solid var(--border2);border-radius:10px;overflow:hidden;margin-bottom:20px">
+            <div style="padding:12px 16px;border-bottom:1px solid var(--border2);font-size:0.78rem;font-weight:700;letter-spacing:0.5px;text-transform:uppercase;color:var(--blue)">
+              Combined Estimate Summary
             </div>
-            <input type="file" id="est-file-input"
-              accept=".pdf,.PDF,image/*,.heic,.heif,application/pdf"
-              style="display:block;width:100%;padding:8px;background:var(--surface2);border:1px solid var(--border);border-radius:8px;color:var(--text);font-size:0.85rem;cursor:pointer"
-              onchange="handleEstFile(this.files[0])"/>
-            <img id="est-preview" class="est-preview" style="display:none;margin-top:12px;max-height:160px;border-radius:8px"/>
-          </div>
-          <!-- Per-estimate overrides -->
-          <div style="margin-top:12px;padding:12px 14px;background:var(--surface2);border-radius:8px;border:1px solid var(--border2)">
-            <div style="font-size:0.72rem;font-weight:600;color:var(--blue);letter-spacing:0.5px;text-transform:uppercase;margin-bottom:10px">
-              ⚙️ Override for this estimate only
-              <span style="font-size:0.68rem;color:var(--text-dim);font-weight:400;text-transform:none;letter-spacing:0"> — leave blank to use defaults from pricing database</span>
-            </div>
-            <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+            <div id="est-summary-rows" style="padding:8px 0"></div>
+            <div class="est-grand-total" style="margin:0;border-radius:0">
               <div>
-                <label style="font-size:0.75rem;color:var(--text-dim);display:block;margin-bottom:4px">
-                  Margin % override
-                  <span id="est-margin-hint" style="color:var(--text-dim);font-size:0.68rem"></span>
-                </label>
-                <input class="modal-input" type="number" id="est-override-margin"
-                  placeholder="e.g. 35"
-                  min="0" max="100"
-                  style="text-align:center"
-                  oninput="updateEstOverrideHints()"/>
+                <div class="est-grand-total-label">Combined Total (all areas)</div>
+                <div style="font-size:0.72rem;color:rgba(255,255,255,0.5);margin-top:2px">Materials + Labour + Margin</div>
               </div>
-              <div>
-                <label style="font-size:0.75rem;color:var(--text-dim);display:block;margin-bottom:4px">
-                  Labour rate AUD/hr override
-                  <span id="est-labour-hint" style="color:var(--text-dim);font-size:0.68rem"></span>
-                </label>
-                <input class="modal-input" type="number" id="est-override-labour"
-                  placeholder="e.g. 95"
-                  min="0"
-                  style="text-align:center"
-                  oninput="updateEstOverrideHints()"/>
-              </div>
+              <div class="est-grand-total-val" id="est-combined-val">AUD $0.00</div>
             </div>
           </div>
-
-          <div style="margin-top:10px;display:flex;gap:10px;flex-wrap:wrap;align-items:center">
-            <div style="flex:1;min-width:200px">
-              <label style="font-size:0.78rem;color:var(--text-dim);display:block;margin-bottom:4px">Extra notes for AI (optional)</label>
-              <input class="modal-input" id="est-notes-input" placeholder="e.g. Client wants soft-close hinges, stone benchtop, 2700mm ceiling height"/>
-            </div>
-            <button class="btn btn-primary" onclick="runEstimator()" id="est-run-btn" style="align-self:flex-end">🤖 Generate Estimate</button>
-          </div>
-        </div>
-
-        <!-- AI status -->
-        <div class="est-ai-status" id="est-status" style="display:none">
-          <div class="est-spinner"></div>
-          <span id="est-status-text">Analysing document…</span>
-        </div>
-
-        <!-- result -->
-        <div id="est-result" style="display:none">
-          <div class="est-section">
-            <div class="est-section-title">Scope of Work</div>
-            <div id="est-scope-text" style="font-size:0.84rem;line-height:1.7;color:var(--text-dim);background:var(--surface);border-radius:8px;padding:14px 16px;border:1px solid var(--border2)"></div>
-          </div>
-          <div class="est-section">
-            <div class="est-section-title">Materials</div>
-            <div style="overflow-x:auto">
-              <table class="est-table" id="est-materials-table">
-                <thead><tr><th>Item</th><th>SKU</th><th>Qty</th><th>Unit</th><th>Unit Price</th><th>Total</th></tr></thead>
-                <tbody id="est-materials-body"></tbody>
-              </table>
-            </div>
-          </div>
-          <div class="est-section">
-            <div class="est-section-title">Labour</div>
-            <div style="overflow-x:auto">
-              <table class="est-table" id="est-labour-table">
-                <thead><tr><th>Task</th><th>Hours</th><th>Rate (AUD/hr)</th><th>Total</th></tr></thead>
-                <tbody id="est-labour-body"></tbody>
-              </table>
-            </div>
-          </div>
-          <div class="est-grand-total">
-            <div>
-              <div class="est-grand-total-label">Total Estimate (incl. margin)</div>
-              <div style="font-size:0.72rem;color:var(--text-dim);margin-top:2px">Materials + Labour + <span id="est-margin-label">margin</span></div>
-            </div>
-            <div class="est-grand-total-val" id="est-total">AUD $0.00</div>
+          <div style="display:flex;gap:10px;justify-content:flex-end;margin-bottom:20px">
+            <button class="btn btn-primary" onclick="downloadCombinedPDF()">⬇️ Download Combined PDF</button>
           </div>
         </div>
 
@@ -3185,411 +3120,203 @@ async function loadPricingFromOneDrive(){
 // ══════════════════════════════════════════════
 // ESTIMATOR ENGINE
 // ══════════════════════════════════════════════
-let currentEstimate = null;
-let estFileData = null;
-let estFileType = null;
 
-function handleEstDrop(e){
-  e.preventDefault();
-  document.getElementById('est-drop-zone').classList.remove('drag');
-  const file = e.dataTransfer.files[0];
-  if(file) handleEstFile(file);
+// ── Multi-item estimator ───────────────────────────────────
+let estimateItems = [];
+let nextItemId = 1;
+
+function addEstimateItem(){
+  const id = nextItemId++;
+  estimateItems.push({id, name:'Area '+id, type:'Kitchen Cabinets', fileData:null, fileType:null, mimeType:null, estimate:null, status:'empty', notes:'', overrideMargin:0, overrideLabour:0});
+  renderEstimateItems();
+  setTimeout(()=>{ const el=document.getElementById('est-item-'+id); if(el) el.scrollIntoView({behavior:'smooth',block:'start'}); },100);
 }
 
-function handleEstFile(file){
+function removeEstimateItem(id){
+  if(estimateItems.length===1){ toast('Keep at least one area'); return; }
+  estimateItems=estimateItems.filter(i=>i.id!==id);
+  renderEstimateItems(); updateCombinedTotal();
+}
+
+function toggleItemCollapse(id){
+  const b=document.getElementById('est-item-body-'+id);
+  if(b) b.classList.toggle('collapsed');
+}
+
+function renderEstimateItems(){
+  const container=document.getElementById('est-items-container');
+  if(!container) return;
+  const types=['Kitchen Cabinets','Bathroom Vanity','Laundry Joinery','Wardrobe / Robe','Custom Joinery','Full Renovation'];
+  container.innerHTML=estimateItems.map((item,idx)=>`
+    <div class="est-item" id="est-item-${item.id}">
+      <div class="est-item-header" onclick="toggleItemCollapse(${item.id})">
+        <div class="est-item-header-left">
+          <div class="est-item-num">${idx+1}</div>
+          <div>
+            <div class="est-item-title">${item.name}</div>
+            <div class="est-item-subtitle">${item.type}${item.estimate?' — estimated':''}</div>
+          </div>
+        </div>
+        <div class="est-item-actions">
+          ${item.estimate?`<span class="est-item-total-badge">AUD $${parseFloat(item.estimate.grandTotal||0).toLocaleString('en-AU',{minimumFractionDigits:2})}</span>`:''}
+          <button class="btn btn-primary btn-sm" onclick="event.stopPropagation();runItemEstimate(${item.id})" ${!item.fileData?'disabled':''}>🤖 Estimate</button>
+          <button class="btn btn-danger btn-sm" onclick="event.stopPropagation();removeEstimateItem(${item.id})">✕</button>
+        </div>
+      </div>
+      <div class="est-item-body" id="est-item-body-${item.id}">
+        <div class="est-form" style="margin-bottom:12px">
+          <div><label style="font-size:0.75rem;color:var(--text-dim);display:block;margin-bottom:4px">Area / Room Name</label>
+            <input class="modal-input" value="${item.name}" onchange="estimateItems.find(i=>i.id===${item.id}).name=this.value" placeholder="e.g. Kitchen, Master Bathroom"/></div>
+          <div><label style="font-size:0.75rem;color:var(--text-dim);display:block;margin-bottom:4px">Type</label>
+            <select class="modal-input" onchange="estimateItems.find(i=>i.id===${item.id}).type=this.value">
+              ${types.map(t=>`<option ${t===item.type?'selected':''}>${t}</option>`).join('')}
+            </select></div>
+        </div>
+        <div style="border:2px dashed var(--border);border-radius:10px;padding:20px;text-align:center;background:var(--surface2);margin-bottom:12px">
+          ${item.fileData?`<div style="color:var(--green);font-size:0.85rem;margin-bottom:8px">✅ ${item.fileType==='pdf'?'PDF':'Image'} loaded</div>`:`<div style="color:var(--text-dim);font-size:0.82rem;margin-bottom:8px">📄 Upload plans or photo</div>`}
+          <input type="file" accept=".pdf,image/*,.heic,.heif" style="display:block;width:100%;padding:6px;background:var(--surface);border:1px solid var(--border);border-radius:6px;color:var(--text);font-size:0.82rem"
+            onchange="handleItemFile(${item.id},this.files[0])"/>
+        </div>
+        <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;margin-bottom:12px">
+          <div><label style="font-size:0.72rem;color:var(--text-dim);display:block;margin-bottom:3px">Margin % override</label>
+            <input class="modal-input" type="number" placeholder="Default: ${PRICING_DB.margin||30}%" id="item-margin-${item.id}" style="text-align:center" value="${item.overrideMargin||''}"/></div>
+          <div><label style="font-size:0.72rem;color:var(--text-dim);display:block;margin-bottom:3px">Labour $/hr override</label>
+            <input class="modal-input" type="number" placeholder="Default: $${PRICING_DB.labourRate||85}" id="item-labour-${item.id}" style="text-align:center" value="${item.overrideLabour||''}"/></div>
+          <div><label style="font-size:0.72rem;color:var(--text-dim);display:block;margin-bottom:3px">Extra notes</label>
+            <input class="modal-input" placeholder="e.g. stone benchtop" id="item-notes-${item.id}" value="${item.notes||''}"/></div>
+        </div>
+        ${item.status==='running'?`<div class="est-ai-status" style="display:flex;margin-bottom:12px"><div class="est-spinner"></div><span id="item-status-text-${item.id}">Analysing…</span></div>`:''}
+        ${item.status==='error'?`<div style="background:rgba(248,81,73,0.1);border:1px solid rgba(248,81,73,0.3);border-radius:8px;padding:10px 14px;font-size:0.8rem;color:var(--red);margin-bottom:12px">❌ ${item.errorMsg||'Error'}</div>`:''}
+        ${item.estimate?renderItemResult(item):''}
+      </div>
+    </div>`).join('');
+}
+
+function renderItemResult(item){
+  const est=item.estimate;
+  const margin=est.marginRate||PRICING_DB.margin||30;
+  const matRows=(est.materials||[]).map(r=>`<tr><td>${r.description}</td><td class="sku">${r.sku||'—'}</td><td style="text-align:center">${r.qty}</td><td style="text-align:center">${r.unit}</td><td style="text-align:right">$${parseFloat(r.unitPrice||0).toFixed(2)}</td><td style="text-align:right"><strong>$${parseFloat(r.total||0).toFixed(2)}</strong></td></tr>`).join('');
+  const labRows=(est.labour||[]).map(r=>`<tr><td>${r.task}</td><td style="text-align:center">${r.hours}hrs</td><td style="text-align:right">$${parseFloat(r.rate||0).toFixed(2)}/hr</td><td style="text-align:right"><strong>$${parseFloat(r.total||0).toFixed(2)}</strong></td></tr>`).join('');
+  return `<div style="background:var(--surface);border-radius:8px;padding:14px;border:1px solid var(--border2)">
+    <div style="font-size:0.78rem;color:var(--text-dim);margin-bottom:10px;line-height:1.6">${est.scope||''}</div>
+    <div style="overflow-x:auto;margin-bottom:10px"><table class="est-table">
+      <thead><tr><th>Item</th><th>SKU</th><th>Qty</th><th>Unit</th><th>Unit Price</th><th>Total</th></tr></thead>
+      <tbody>${matRows}<tr style="font-weight:700;border-top:1px solid var(--border)"><td colspan="5" style="color:var(--text-dim);font-size:0.78rem">Materials Subtotal</td><td style="text-align:right">$${parseFloat(est.subtotalMaterials||0).toFixed(2)}</td></tr></tbody>
+    </table></div>
+    <div style="overflow-x:auto;margin-bottom:10px"><table class="est-table">
+      <thead><tr><th>Task</th><th>Hours</th><th>Rate</th><th>Total</th></tr></thead>
+      <tbody>${labRows}<tr style="font-weight:700;border-top:1px solid var(--border)"><td colspan="3" style="color:var(--text-dim);font-size:0.78rem">Labour Subtotal</td><td style="text-align:right">$${parseFloat(est.subtotalLabour||0).toFixed(2)}</td></tr></tbody>
+    </table></div>
+    <div style="display:flex;justify-content:space-between;align-items:center;background:rgba(56,139,253,0.08);border:1px solid rgba(56,139,253,0.2);border-radius:8px;padding:10px 14px">
+      <div style="font-size:0.82rem;color:var(--text-dim)">Area Total (incl. ${margin}% margin)</div>
+      <div style="font-family:'Orbitron',monospace;font-size:1.1rem;font-weight:700;color:var(--blue)">AUD $${parseFloat(est.grandTotal||0).toLocaleString('en-AU',{minimumFractionDigits:2})}</div>
+    </div>
+  </div>`;
+}
+
+function handleItemFile(id,file){
   if(!file) return;
-  const isPDF = file.type === 'application/pdf' || file.name.toLowerCase().endsWith('.pdf');
-  estFileType = isPDF ? 'pdf' : 'image';
-  // store actual mime type for API call
-  window._estMimeType = isPDF ? 'application/pdf' : (file.type || 'image/jpeg');
-  const reader = new FileReader();
-  reader.onload = e => {
-    estFileData = e.target.result.split(',')[1]; // base64
-    const preview = document.getElementById('est-preview');
-    if(!isPDF && preview){
-      preview.src = e.target.result;
-      preview.style.display = 'block';
-    } else if(preview){
-      preview.style.display = 'none';
-    }
-    const txt = document.getElementById('est-upload-text');
-    if(txt) txt.innerHTML = '<strong>✅ ' + file.name + '</strong><br><span style="color:var(--green)">Ready to analyse — ' + (isPDF ? 'PDF' : 'Image') + '</span>';
-    toast('✅ File loaded: ' + file.name);
-  };
-  reader.onerror = () => toast('❌ Could not read file');
+  const item=estimateItems.find(i=>i.id===id);
+  if(!item) return;
+  const isPDF=file.type==='application/pdf'||file.name.toLowerCase().endsWith('.pdf');
+  item.fileType=isPDF?'pdf':'image';
+  item.mimeType=isPDF?'application/pdf':(file.type||'image/jpeg');
+  const reader=new FileReader();
+  reader.onload=e=>{ item.fileData=e.target.result.split(',')[1]; toast('✅ '+file.name+' loaded'); renderEstimateItems(); };
   reader.readAsDataURL(file);
 }
 
-function setEstStatus(text, show=true){
-  const el = document.getElementById('est-status');
-  const txt = document.getElementById('est-status-text');
-  if(el) el.style.display = show ? 'flex' : 'none';
-  if(txt) txt.textContent = text;
+function updateCombinedTotal(){
+  const done=estimateItems.filter(i=>i.estimate);
+  const totalEl=document.getElementById('est-combined-total');
+  const summaryEl=document.getElementById('est-summary-rows');
+  const valEl=document.getElementById('est-combined-val');
+  if(!totalEl) return;
+  if(!done.length){ totalEl.style.display='none'; return; }
+  totalEl.style.display='block';
+  let grand=0;
+  summaryEl.innerHTML=done.map(item=>{
+    const v=parseFloat(item.estimate.grandTotal||0); grand+=v;
+    return `<div class="est-summary-row"><div class="est-summary-row-label">${item.name} (${item.type})</div><div class="est-summary-row-val">AUD $${v.toLocaleString('en-AU',{minimumFractionDigits:2})}</div></div>`;
+  }).join('');
+  valEl.textContent='AUD $'+grand.toLocaleString('en-AU',{minimumFractionDigits:2,maximumFractionDigits:2});
 }
 
-async function runEstimator(){
-  const client  = document.getElementById('est-client')?.value.trim();
-  const address = document.getElementById('est-address')?.value.trim();
-  const type    = document.getElementById('est-type')?.value;
-  const notes          = document.getElementById('est-notes-input')?.value.trim();
-  const overrideMargin = parseFloat(document.getElementById('est-override-margin')?.value) || 0;
-  const overrideLabour = parseFloat(document.getElementById('est-override-labour')?.value) || 0;
-
-  if(!client){ toast('⚠️ Please enter client name'); return; }
-  if(!estFileData){ toast('⚠️ Please upload a PDF or image first'); return; }
-
-  // Set today's date if empty
-  const dateEl = document.getElementById('est-date');
-  if(dateEl && !dateEl.value) dateEl.value = new Date().toISOString().split('T')[0];
-
-  const btn = document.getElementById('est-run-btn');
-  if(btn){ btn.disabled=true; btn.textContent='Analysing…'; }
-  document.getElementById('est-result').style.display = 'none';
-  document.getElementById('est-pdf-btn').style.display = 'none';
-  setEstStatus('Analysing document with AI…');
-
-  // build pricing context for AI
-  const pricingContext = PRICING_DB.items.length
-    ? 'PRICING DATABASE (use these for matching):\n' + 
-      'SKU | Description | Unit | BulkPrice | LabourHours | InstallCost | Margin%\n' +
-      PRICING_DB.items.map(i=>`${i.sku} | ${i.description} | ${i.unit} | $${i.bulkPrice} | ${i.labourHours}hrs | $${i.installCost} | ${i.margin}%`).join('\n')
-    : 'No pricing database loaded. Use reasonable Australian market rates for cabinet/joinery work.';
-
-  const prompt = `You are an expert cabinet maker and joinery estimator in Australia. Analyse the uploaded ${estFileType === 'pdf' ? 'PDF document' : 'image'} for a ${type} project.
-
-Client: ${client}
-Address: ${address || 'Not specified'}
-Project Type: ${type}
-${notes ? 'Additional Notes: ' + notes : ''}
-
-${pricingContext}
-
-Default labour rate: AUD $${overrideLabour || PRICING_DB.labourRate}/hr
-Default margin: ${overrideMargin || PRICING_DB.margin}%
-
-Based on the uploaded file, provide a detailed estimate in this EXACT JSON format (no markdown, no extra text):
-{
-  "scope": "2-3 sentence summary of the scope of work",
-  "materials": [
-    {"sku": "SKU or empty", "description": "item name", "qty": 1, "unit": "each", "unitPrice": 0, "total": 0}
-  ],
-  "labour": [
-    {"task": "task name", "hours": 0, "rate": ${PRICING_DB.labourRate}, "total": 0}
-  ],
-  "subtotalMaterials": 0,
-  "subtotalLabour": 0,
-  "marginRate": ${overrideMargin || PRICING_DB.margin},
-  "marginAmount": 0,
-  "grandTotal": 0
-}
-
-Rules:
-- Match items to the pricing database by description keywords
-- Use bulk prices from the database, not retail prices
-- Apply margin to the GRAND TOTAL only (do not show per-line)
-- grandTotal = (subtotalMaterials + subtotalLabour) * (1 + marginRate/100)
-- All prices in AUD
-- Be realistic and thorough — don't miss obvious items`;
-
+async function runItemEstimate(id){
+  const item=estimateItems.find(i=>i.id===id);
+  if(!item||!item.fileData) return;
+  item.overrideMargin=parseFloat(document.getElementById('item-margin-'+id)?.value)||0;
+  item.overrideLabour=parseFloat(document.getElementById('item-labour-'+id)?.value)||0;
+  item.notes=document.getElementById('item-notes-'+id)?.value||'';
+  item.status='running'; item.errorMsg='';
+  renderEstimateItems();
+  const setS=t=>{ const el=document.getElementById('item-status-text-'+id); if(el) el.textContent=t; };
+  const margin=item.overrideMargin||PRICING_DB.margin||30;
+  const labourRate=item.overrideLabour||PRICING_DB.labourRate||85;
+  const pCtx=PRICING_DB.items.length?'PRICING DATABASE:\nSKU|Description|Unit|BulkPrice|LabourHrs|InstallCost|Margin%\n'+PRICING_DB.items.map(p=>`${p.sku}|${p.description}|${p.unit}|$${p.bulkPrice}|${p.labourHours}hrs|$${p.installCost}|${p.margin}%`).join('\n'):'Use reasonable Australian market rates.';
+  const prompt=`You are an expert cabinet maker and joinery estimator in Australia.\nAnalyse this ${item.fileType==='pdf'?'PDF':'image'} for a ${item.type} project.\nArea: ${item.name}\n${item.notes?'Notes: '+item.notes:''}\n${pCtx}\nLabour: AUD $${labourRate}/hr\nMargin: ${margin}%\nRespond ONLY with valid JSON (no markdown):\n{"scope":"brief summary","materials":[{"sku":"","description":"","qty":1,"unit":"each","unitPrice":0,"total":0}],"labour":[{"task":"","hours":0,"rate":${labourRate},"total":0}],"subtotalMaterials":0,"subtotalLabour":0,"marginRate":${margin},"marginAmount":0,"grandTotal":0}\ngrandTotal=(subtotalMaterials+subtotalLabour)*(1+${margin}/100)`;
   try{
-    setEstStatus('AI is reading the document…');
-    
-    // Build messages with file attachment
-    const content = [
-      { type: 'text', text: prompt }
-    ];
-    
-    if(estFileType === 'image'){
-      const mimeType = window._estMimeType || 'image/jpeg';
-      // Claude supports image/jpeg, image/png, image/gif, image/webp
-      // convert unsupported types to jpeg label (data is still valid)
-      const supportedMime = ['image/jpeg','image/png','image/gif','image/webp'].includes(mimeType) ? mimeType : 'image/jpeg';
-      content.unshift({ 
-        type: 'image', 
-        source: { type: 'base64', media_type: supportedMime, data: estFileData }
-      });
-    } else {
-      content.unshift({
-        type: 'document',
-        source: { type: 'base64', media_type: 'application/pdf', data: estFileData }
-      });
-    }
-
-    setEstStatus('Sending to AI… this may take 20-30 seconds');
-
-    const openAIKey = await getOpenAIKey();
-    if(!openAIKey) throw new Error('Could not decrypt OpenAI key.');
-
-    // Build OpenAI request with file support
+    const apiKey=await getOpenAIKey();
+    if(!apiKey) throw new Error('Could not decrypt OpenAI key.');
     let resp;
-    try{
-      if(estFileType === 'pdf'){
-        // Upload PDF to OpenAI Files API first, then reference it
-        setEstStatus('Uploading PDF to OpenAI…');
-
-        // Convert base64 to blob
-        const byteChars = atob(estFileData);
-        const byteArr = new Uint8Array(byteChars.length);
-        for(let i=0;i<byteChars.length;i++) byteArr[i]=byteChars.charCodeAt(i);
-        const pdfBlob = new Blob([byteArr], {type:'application/pdf'});
-
-        // Upload via Files API
-        const formData = new FormData();
-        formData.append('file', pdfBlob, 'document.pdf');
-        formData.append('purpose', 'assistants');
-
-        const uploadResp = await fetch('https://api.openai.com/v1/files', {
-          method: 'POST',
-          headers: { 'Authorization': 'Bearer ' + openAIKey },
-          body: formData
-        });
-        if(!uploadResp.ok){
-          const e = await uploadResp.text();
-          throw new Error('PDF upload failed: ' + e.slice(0,200));
-        }
-        const uploadData = await uploadResp.json();
-        const fileId = uploadData.id;
-
-        setEstStatus('Analysing PDF with AI…');
-
-        // Use the Responses API with file search
-        const openAIBody = {
-          model: 'gpt-4o',
-          max_tokens: 4000,
-          messages: [{
-            role: 'user',
-            content: [
-              { type: 'text', text: prompt },
-              { type: 'file', file: { file_id: fileId } }
-            ]
-          }]
-        };
-        resp = await fetch('https://api.openai.com/v1/chat/completions', {
-          method: 'POST',
-          headers: { 'Content-Type':'application/json', 'Authorization':'Bearer ' + openAIKey },
-          body: JSON.stringify(openAIBody)
-        });
-
-        // Clean up uploaded file
-        fetch('https://api.openai.com/v1/files/' + fileId, {
-          method: 'DELETE',
-          headers: { 'Authorization': 'Bearer ' + openAIKey }
-        }).catch(()=>{});
-
-      } else {
-        // Image — send inline as base64
-        setEstStatus('Analysing image with AI…');
-        const mimeType = (['image/jpeg','image/png','image/gif','image/webp'].includes(window._estMimeType||'')) ? window._estMimeType : 'image/jpeg';
-        const openAIBody = {
-          model: 'gpt-4o',
-          max_tokens: 4000,
-          messages: [{
-            role: 'user',
-            content: [
-              { type: 'image_url', image_url: { url: 'data:' + mimeType + ';base64,' + estFileData, detail: 'high' } },
-              { type: 'text', text: prompt }
-            ]
-          }]
-        };
-        resp = await fetch('https://api.openai.com/v1/chat/completions', {
-          method: 'POST',
-          headers: { 'Content-Type':'application/json', 'Authorization':'Bearer ' + openAIKey },
-          body: JSON.stringify(openAIBody)
-        });
-      }
-    }catch(e){
-      throw new Error('Network error: ' + e.message);
+    if(item.fileType==='pdf'){
+      setS('Uploading PDF…');
+      const ba=atob(item.fileData); const arr=new Uint8Array(ba.length); for(let i=0;i<ba.length;i++) arr[i]=ba.charCodeAt(i);
+      const fd=new FormData(); fd.append('file',new Blob([arr],{type:'application/pdf'}),'doc.pdf'); fd.append('purpose','assistants');
+      const ur=await fetch('https://api.openai.com/v1/files',{method:'POST',headers:{'Authorization':'Bearer '+apiKey},body:fd});
+      if(!ur.ok) throw new Error('PDF upload: '+(await ur.text()).slice(0,150));
+      const ud=await ur.json();
+      setS('Analysing PDF…');
+      resp=await fetch('https://api.openai.com/v1/chat/completions',{method:'POST',headers:{'Content-Type':'application/json','Authorization':'Bearer '+apiKey},body:JSON.stringify({model:'gpt-4o',max_tokens:4000,messages:[{role:'user',content:[{type:'text',text:prompt},{type:'file',file:{file_id:ud.id}}]}]})});
+      fetch('https://api.openai.com/v1/files/'+ud.id,{method:'DELETE',headers:{'Authorization':'Bearer '+apiKey}}).catch(()=>{});
+    } else {
+      const mime=(['image/jpeg','image/png','image/gif','image/webp'].includes(item.mimeType||''))?item.mimeType:'image/jpeg';
+      setS('Analysing image…');
+      resp=await fetch('https://api.openai.com/v1/chat/completions',{method:'POST',headers:{'Content-Type':'application/json','Authorization':'Bearer '+apiKey},body:JSON.stringify({model:'gpt-4o',max_tokens:4000,messages:[{role:'user',content:[{type:'image_url',image_url:{url:'data:'+mime+';base64,'+item.fileData,detail:'high'}},{type:'text',text:prompt}]}]})});
     }
-
-    if(!resp.ok){
-      const errBody = await resp.text();
-      throw new Error('OpenAI error ' + resp.status + ': ' + errBody.slice(0,300));
-    }
-    if(!resp.ok){
-      const errBody = await resp.text();
-      throw new Error('OpenAI error ' + resp.status + ': ' + errBody.slice(0,300));
-    }
-    const data = await resp.json();
-    const text = data.choices?.[0]?.message?.content || '';
-    if(!text) throw new Error('Empty response from OpenAI: ' + JSON.stringify(data).slice(0,200));
-    
-    // parse JSON from response
-    const jsonMatch = text.match(/\{[\s\S]*\}/);
-    if(!jsonMatch) throw new Error('AI returned unexpected format');
-    
-    currentEstimate = JSON.parse(jsonMatch[0]);
-    currentEstimate.client  = client;
-    currentEstimate.address = address;
-    currentEstimate.type    = type;
-    currentEstimate.date    = dateEl?.value || new Date().toISOString().split('T')[0];
-    
-    renderEstimate(currentEstimate);
-    setEstStatus('', false);
-    document.getElementById('est-result').style.display = 'block';
-    document.getElementById('est-pdf-btn').style.display = 'inline-flex';
-    toast('✅ Estimate generated!');
-    
-  }catch(e){
-    const errMsg = e.message || 'Unknown error';
-    setEstStatus('❌ ' + errMsg);
-    console.error('Estimator error:', e);
-    // show full error on screen so user can report it
-    setEstStatus('❌ ' + errMsg);
-    toast('❌ ' + errMsg.slice(0,80));
-  }finally{
-    if(btn){ btn.disabled=false; btn.textContent='🤖 Generate Estimate'; }
-  }
+    if(!resp.ok) throw new Error('OpenAI '+resp.status+': '+(await resp.text()).slice(0,200));
+    const data=await resp.json();
+    const text=data.choices?.[0]?.message?.content||'';
+    if(!text) throw new Error('Empty response');
+    const m=text.match(/\{[\s\S]*\}/);
+    if(!m) throw new Error('No JSON in response');
+    item.estimate=JSON.parse(m[0]);
+    item.status='done';
+    toast('✅ '+item.name+' estimated!');
+  }catch(e){ item.status='error'; item.errorMsg=e.message; toast('❌ '+e.message.slice(0,60)); }
+  renderEstimateItems(); updateCombinedTotal();
 }
 
-function renderEstimate(est){
-  // scope
-  document.getElementById('est-scope-text').textContent = est.scope || '';
-  
-  // materials
-  const mb = document.getElementById('est-materials-body');
-  if(mb) mb.innerHTML = (est.materials||[]).map(r=>`
-    <tr>
-      <td>${r.description}</td>
-      <td class="sku">${r.sku||'—'}</td>
-      <td>${r.qty}</td>
-      <td>${r.unit}</td>
-      <td>$${parseFloat(r.unitPrice||0).toFixed(2)}</td>
-      <td><strong>$${parseFloat(r.total||0).toFixed(2)}</strong></td>
-    </tr>`).join('') + `
-    <tr class="est-total-row">
-      <td colspan="5">Materials Subtotal</td>
-      <td><strong>$${parseFloat(est.subtotalMaterials||0).toFixed(2)}</strong></td>
-    </tr>`;
-
-  // labour
-  const lb = document.getElementById('est-labour-body');
-  if(lb) lb.innerHTML = (est.labour||[]).map(r=>`
-    <tr>
-      <td>${r.task}</td>
-      <td>${r.hours} hrs</td>
-      <td>$${parseFloat(r.rate||0).toFixed(2)}/hr</td>
-      <td><strong>$${parseFloat(r.total||0).toFixed(2)}</strong></td>
-    </tr>`).join('') + `
-    <tr class="est-total-row">
-      <td colspan="3">Labour Subtotal</td>
-      <td><strong>$${parseFloat(est.subtotalLabour||0).toFixed(2)}</strong></td>
-    </tr>`;
-
-  // grand total
-  const margin = est.marginRate || PRICING_DB.margin || 30;
-  document.getElementById('est-margin-label').textContent = margin + '% margin applied';
-  document.getElementById('est-total').textContent = 'AUD $' + parseFloat(est.grandTotal||0).toLocaleString('en-AU', {minimumFractionDigits:2, maximumFractionDigits:2});
-}
-
-function updateEstOverrideHints(){
-  const marginEl  = document.getElementById('est-override-margin');
-  const labourEl  = document.getElementById('est-override-labour');
-  const mHint     = document.getElementById('est-margin-hint');
-  const lHint     = document.getElementById('est-labour-hint');
-  if(mHint){
-    const def = PRICING_DB.margin || 30;
-    mHint.textContent = marginEl?.value ? '(default: ' + def + '%)' : '(default: ' + def + '%)';
-    mHint.style.color = marginEl?.value ? 'var(--gold)' : 'var(--text-dim)';
-  }
-  if(lHint){
-    const def = PRICING_DB.labourRate || 85;
-    lHint.textContent = labourEl?.value ? '(default: $' + def + '/hr)' : '(default: $' + def + '/hr)';
-    lHint.style.color = labourEl?.value ? 'var(--gold)' : 'var(--text-dim)';
-  }
+async function downloadCombinedPDF(){
+  const client=document.getElementById('est-client')?.value||'Client';
+  const address=document.getElementById('est-address')?.value||'';
+  const date=document.getElementById('est-date')?.value||new Date().toISOString().split('T')[0];
+  const done=estimateItems.filter(i=>i.estimate);
+  if(!done.length){ toast('No estimates to download'); return; }
+  let grand=0;
+  const sections=done.map(item=>{
+    const est=item.estimate; const margin=est.marginRate||30; grand+=parseFloat(est.grandTotal||0);
+    const mR=(est.materials||[]).map(r=>`<tr><td>${r.description}</td><td style="color:#888;font-size:11px">${r.sku||'—'}</td><td style="text-align:center">${r.qty}</td><td style="text-align:center">${r.unit}</td><td style="text-align:right">$${parseFloat(r.unitPrice||0).toFixed(2)}</td><td style="text-align:right"><b>$${parseFloat(r.total||0).toFixed(2)}</b></td></tr>`).join('');
+    const lR=(est.labour||[]).map(r=>`<tr><td>${r.task}</td><td style="text-align:center">${r.hours}hrs</td><td style="text-align:right">$${parseFloat(r.rate||0).toFixed(2)}/hr</td><td style="text-align:right"><b>$${parseFloat(r.total||0).toFixed(2)}</b></td></tr>`).join('');
+    return `<div style="margin-bottom:28px;page-break-inside:avoid"><h3 style="color:#1a237e;border-bottom:2px solid #1a237e;padding-bottom:4px;margin-bottom:8px">${item.name} — ${item.type}</h3><p style="font-size:11px;color:#555;margin:0 0 10px">${est.scope||''}</p><table style="width:100%;border-collapse:collapse;margin-bottom:6px;font-size:11px"><thead><tr style="background:#1a237e;color:#fff"><th style="padding:5px 8px;text-align:left">Item</th><th>SKU</th><th>Qty</th><th>Unit</th><th>Unit $</th><th>Total</th></tr></thead><tbody>${mR}<tr style="font-weight:700;border-top:2px solid #ddd"><td colspan="5" style="padding:5px 8px;color:#666">Materials Subtotal</td><td style="text-align:right;padding:5px 8px">$${parseFloat(est.subtotalMaterials||0).toFixed(2)}</td></tr></tbody></table><table style="width:100%;border-collapse:collapse;margin-bottom:6px;font-size:11px"><thead><tr style="background:#1a237e;color:#fff"><th style="padding:5px 8px;text-align:left">Task</th><th>Hours</th><th>Rate</th><th>Total</th></tr></thead><tbody>${lR}<tr style="font-weight:700;border-top:2px solid #ddd"><td colspan="3" style="padding:5px 8px;color:#666">Labour Subtotal</td><td style="text-align:right;padding:5px 8px">$${parseFloat(est.subtotalLabour||0).toFixed(2)}</td></tr></tbody></table><div style="background:#e8eaf6;padding:8px 12px;border-radius:4px;display:flex;justify-content:space-between;font-size:12px"><span>Area Total (incl. ${margin}% margin)</span><strong>AUD $${parseFloat(est.grandTotal||0).toLocaleString('en-AU',{minimumFractionDigits:2})}</strong></div></div>`;
+  }).join('');
+  const sumRows=done.map(i=>`<tr><td style="padding:6px 10px">${i.name}</td><td style="padding:6px 10px;color:#666">${i.type}</td><td style="padding:6px 10px;text-align:right;font-weight:600">AUD $${parseFloat(i.estimate.grandTotal||0).toLocaleString('en-AU',{minimumFractionDigits:2})}</td></tr>`).join('');
+  const html=`<!DOCTYPE html><html><head><meta charset="UTF-8"/><style>body{font-family:Arial,sans-serif;font-size:12px;color:#222;padding:40px;max-width:800px;margin:0 auto}h1{color:#1a237e;font-size:20px}table{width:100%;border-collapse:collapse}th{background:#1a237e;color:#fff;padding:6px 8px;text-align:left}td{border-bottom:1px solid #eee;padding:5px 8px}.grand{background:#1a237e;color:#fff;padding:14px 20px;border-radius:6px;display:flex;justify-content:space-between;margin:16px 0}.footer{text-align:center;font-size:10px;color:#999;border-top:1px solid #eee;padding-top:10px;margin-top:20px}</style></head><body><h1>VIP Cabinets — Combined Estimate</h1><p style="color:#666">${client} · ${address||'—'} · ${date}</p><h3 style="color:#1a237e">Summary</h3><table><thead><tr><th>Area</th><th>Type</th><th>Total</th></tr></thead><tbody>${sumRows}</tbody></table><div class="grand"><span>Combined Total (all areas, incl. margin)</span><strong style="font-size:18px">AUD $${grand.toLocaleString('en-AU',{minimumFractionDigits:2})}</strong></div><h3 style="color:#1a237e">Detailed Breakdown</h3>${sections}<div class="footer">Valid 30 days · All prices AUD · PAH Admin Panel</div></body></html>`;
+  const w=window.open('','_blank'); w.document.write(html); w.document.close(); setTimeout(()=>w.print(),500);
 }
 
 function clearEstimate(){
-  currentEstimate = null; estFileData = null; estFileType = null;
-  document.getElementById('est-result').style.display = 'none';
-  document.getElementById('est-pdf-btn').style.display = 'none';
-  document.getElementById('est-status').style.display = 'none';
-  document.getElementById('est-client').value = '';
-  document.getElementById('est-address').value = '';
-  document.getElementById('est-notes-input').value = '';
-  document.getElementById('est-override-margin').value = '';
-  document.getElementById('est-override-labour').value = '';
-  updateEstOverrideHints();
-  document.getElementById('est-date').value = '';
-  document.getElementById('est-preview').style.display = 'none';
-  const txt = document.getElementById('est-upload-text');
-  if(txt) txt.innerHTML = '<strong>Tap to upload or drag & drop</strong><br>PDF, JPG, PNG, HEIC — floor plans, sketches, scope documents';
-  document.getElementById('est-file-input').value = '';
+  estimateItems=[{id:1,name:'Area 1',type:'Kitchen Cabinets',fileData:null,fileType:null,mimeType:null,estimate:null,status:'empty',notes:'',overrideMargin:0,overrideLabour:0}];
+  nextItemId=2;
+  const f=id=>{ const el=document.getElementById(id); if(el) el.value=''; };
+  f('est-client'); f('est-address'); f('est-date');
+  const t=document.getElementById('est-combined-total'); if(t) t.style.display='none';
+  renderEstimateItems();
 }
 
-async function downloadEstimatePDF(){
-  if(!currentEstimate){ toast('No estimate to download'); return; }
-  const btn = document.getElementById('est-pdf-btn');
-  if(btn){ btn.disabled=true; btn.textContent='Generating PDF…'; }
-  
-  try{
-    // Build HTML for PDF
-    const margin = currentEstimate.marginRate || PRICING_DB.margin || 30;
-    const matRows = (currentEstimate.materials||[]).map(r=>
-      `<tr><td>${r.description}</td><td style="color:#666;font-size:11px">${r.sku||'—'}</td><td style="text-align:center">${r.qty}</td><td style="text-align:center">${r.unit}</td><td style="text-align:right">$${parseFloat(r.unitPrice||0).toFixed(2)}</td><td style="text-align:right"><strong>$${parseFloat(r.total||0).toFixed(2)}</strong></td></tr>`
-    ).join('');
-    const labRows = (currentEstimate.labour||[]).map(r=>
-      `<tr><td>${r.task}</td><td style="text-align:center">${r.hours} hrs</td><td style="text-align:right">$${parseFloat(r.rate||0).toFixed(2)}/hr</td><td style="text-align:right"><strong>$${parseFloat(r.total||0).toFixed(2)}</strong></td></tr>`
-    ).join('');
+function updateEstOverrideHints(){} // kept for compat
 
-    const html = `<!DOCTYPE html><html><head><meta charset="UTF-8"/>
-<style>
-  body{font-family:Arial,sans-serif;font-size:13px;color:#222;padding:40px;max-width:800px;margin:0 auto}
-  h1{color:#1a237e;font-size:22px;margin-bottom:4px}
-  .subtitle{color:#666;font-size:13px;margin-bottom:24px}
-  .header{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:32px;padding-bottom:16px;border-bottom:2px solid #1a237e}
-  .company{font-size:11px;color:#666;text-align:right}
-  .info-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:24px;background:#f8f9fa;padding:14px;border-radius:6px}
-  .info-item label{font-size:11px;color:#999;display:block;margin-bottom:2px}
-  .info-item span{font-weight:600}
-  h3{color:#1a237e;font-size:13px;letter-spacing:0.5px;text-transform:uppercase;margin:20px 0 8px;padding-bottom:4px;border-bottom:1px solid #e0e0e0}
-  .scope{background:#f8f9fa;padding:12px;border-radius:6px;color:#444;line-height:1.7;margin-bottom:20px;font-size:12px}
-  table{width:100%;border-collapse:collapse;margin-bottom:8px}
-  th{background:#1a237e;color:#fff;padding:7px 10px;text-align:left;font-size:11px}
-  td{padding:7px 10px;border-bottom:1px solid #eee;font-size:12px}
-  tr:nth-child(even) td{background:#fafafa}
-  .subtotal td{font-weight:700;border-top:2px solid #ddd;background:#f0f4ff!important}
-  .grand-total{margin-top:24px;padding:16px 20px;background:#1a237e;border-radius:8px;display:flex;justify-content:space-between;align-items:center;color:#fff}
-  .grand-total-label{font-size:13px;opacity:0.85}
-  .grand-total-val{font-size:22px;font-weight:700}
-  .footer{margin-top:40px;font-size:10px;color:#999;text-align:center;border-top:1px solid #eee;padding-top:12px}
-</style></head><body>
-<div class="header">
-  <div><h1>VIP Cabinets — Estimate</h1><div class="subtitle">${currentEstimate.type}</div></div>
-  <div class="company">PAH Admin Panel<br>${currentEstimate.date}</div>
-</div>
-<div class="info-grid">
-  <div class="info-item"><label>Client</label><span>${currentEstimate.client}</span></div>
-  <div class="info-item"><label>Address</label><span>${currentEstimate.address||'—'}</span></div>
-  <div class="info-item"><label>Project Type</label><span>${currentEstimate.type}</span></div>
-  <div class="info-item"><label>Estimate Date</label><span>${currentEstimate.date}</span></div>
-</div>
-<h3>Scope of Work</h3>
-<div class="scope">${currentEstimate.scope||''}</div>
-<h3>Materials</h3>
-<table><thead><tr><th>Item</th><th>SKU</th><th>Qty</th><th>Unit</th><th>Unit Price</th><th>Total</th></tr></thead>
-<tbody>${matRows}<tr class="subtotal"><td colspan="5">Materials Subtotal</td><td style="text-align:right">$${parseFloat(currentEstimate.subtotalMaterials||0).toFixed(2)}</td></tr></tbody></table>
-<h3>Labour</h3>
-<table><thead><tr><th>Task</th><th>Hours</th><th>Rate</th><th>Total</th></tr></thead>
-<tbody>${labRows}<tr class="subtotal"><td colspan="3">Labour Subtotal</td><td style="text-align:right">$${parseFloat(currentEstimate.subtotalLabour||0).toFixed(2)}</td></tr></tbody></table>
-<div class="grand-total">
-  <div class="grand-total-label">Total Estimate (incl. ${margin}% margin)<br><span style="font-size:10px;opacity:0.6">Materials + Labour + Margin</span></div>
-  <div class="grand-total-val">AUD $${parseFloat(currentEstimate.grandTotal||0).toLocaleString('en-AU',{minimumFractionDigits:2})}</div>
-</div>
-<div class="footer">This estimate is valid for 30 days. Prices include ${margin}% margin. All prices in AUD. Generated by PAH Admin Panel.</div>
-</body></html>`;
 
-    // open in new window and print to PDF
-    const w = window.open('', '_blank');
-    w.document.write(html);
-    w.document.close();
-    setTimeout(()=>{ w.print(); }, 500);
-    
-  }catch(e){
-    toast('❌ PDF failed: ' + e.message);
-  }finally{
-    if(btn){ btn.disabled=false; btn.textContent='⬇️ Download PDF'; }
-  }
-}
 
 
 </script>
