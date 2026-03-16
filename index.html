@@ -1244,6 +1244,7 @@ async function doLogin(){
   getAnthropicKey();
   getGeminiKey();
   getGeminiKey2();
+  getOpenAIKey();
 
   showApp(user);
   updateGhTokenUI();
@@ -1582,6 +1583,7 @@ const ENCRYPTED_TOKEN = {"salt": "6TSXf13ZpQ5pOSINzIb7yw==", "iv": "PrdkkIu7kvWC
 const ENCRYPTED_ANTHROPIC = {"salt": "8RH+eEDxgr4rBiHn0sQAwQ==", "iv": "h2iBTiUB3ZbWwYYh", "data": "IFkLEI19k5zAEywPr1xi05AEGXd72wjJPKhQZCVDHWCJ1MGmKzGvR2cf4q2wtZmRvBfbHxLdIUW8evStJdkWNYiCDJ7XdiOu5p0/HXDcLTRwc4gYPIGGJFKcueG31vqD6qkWQoEPQ8rkq6SGZ8/rS2HQRBt41b+4jzbNyA=="};
 const ENCRYPTED_GEMINI  = {"salt": "jj/dQ4JXYazz/Ne+70xeBw==", "iv": "mjQbSyS54K7P/C2R", "data": "tJFq6dOfBWjBYEpjc0g1HJTRM2Qo8iiiUumuKD0A29yO4YJibcOD9pOIUB8p9j6/9CVWtF+9/w=="};
 const ENCRYPTED_GEMINI2 = {"salt": "6CIGm7/G0RjRKzhsPVA2JA==", "iv": "IJC5WDImR6kEpqwF", "data": "Tfktj5fOgkXwPFwPE5G6gPKz2fTDWkj9M/77gu0thZk33sc0FAq5GQoT8Ju6WS9A0rpaGfeXEQ=="};
+const ENCRYPTED_OPENAI = {"salt": "/KMEqEHpADbbj2ldQ1/9+g==", "iv": "Wt7aK1QpiOA00jT1", "data": "rc506sgV35DsihWKQ+brtVg3pQFHpbkcy6rIaJuOBp6hqGEMH+LWWCjmzOIdmNWAu6wC1w/g34/x3bAYb8xmgBWs05rASRx6maMo8SPsPOkPF9VdaxHta4VYoHQgeXr0k2bIUjYBogMZWsOe75KF7xSSgxEZ0sP1u+LdyeT8sp2aLEjRzLetjGedsL+7+7di6mko8niGoiqnOKq5cXJoImwrgRjofSbuXWIO6rOJfmDYQ7X6"};
 
 async function deriveKey(password, saltB64){
   const enc = new TextEncoder();
@@ -1648,6 +1650,20 @@ async function getGeminiKey2(){
     const decrypted = await crypto.subtle.decrypt({name:'AES-GCM',iv},key,data);
     const apiKey = new TextDecoder().decode(decrypted);
     sessionStorage.setItem('pah_gemini_key2', apiKey);
+    return apiKey;
+  }catch(e){ return null; }
+}
+
+async function getOpenAIKey(){
+  const cached = sessionStorage.getItem('pah_openai_key');
+  if(cached) return cached;
+  try{
+    const key = await deriveKey('Admin_vipcabinets', ENCRYPTED_OPENAI.salt);
+    const iv = Uint8Array.from(atob(ENCRYPTED_OPENAI.iv), c=>c.charCodeAt(0));
+    const data = Uint8Array.from(atob(ENCRYPTED_OPENAI.data), c=>c.charCodeAt(0));
+    const decrypted = await crypto.subtle.decrypt({name:'AES-GCM',iv},key,data);
+    const apiKey = new TextDecoder().decode(decrypted);
+    sessionStorage.setItem('pah_openai_key', apiKey);
     return apiKey;
   }catch(e){ return null; }
 }
@@ -3267,48 +3283,48 @@ Rules:
 
     setEstStatus('Sending to AI… this may take 20-30 seconds');
 
-    // Build Gemini request
-    const parts = [];
+    const openAIKey = await getOpenAIKey();
+    if(!openAIKey) throw new Error('Could not decrypt OpenAI key.');
+
+    // Build OpenAI messages with file
+    const msgContent = [];
     if(estFileType === 'image'){
       const mimeType = (['image/jpeg','image/png','image/gif','image/webp'].includes(window._estMimeType||'')) ? window._estMimeType : 'image/jpeg';
-      parts.push({ inline_data: { mime_type: mimeType, data: estFileData } });
+      msgContent.push({ type:'image_url', image_url:{ url: 'data:' + mimeType + ';base64,' + estFileData } });
     } else {
-      parts.push({ inline_data: { mime_type: 'application/pdf', data: estFileData } });
+      // PDF — send as file attachment via base64
+      msgContent.push({ type:'text', text:'[PDF attached as base64 — analyse the following document data for cabinet/joinery scope:]' });
+      msgContent.push({ type:'text', text: estFileData.slice(0, 8000) }); // first 8k chars of base64
     }
-    parts.push({ text: prompt });
+    msgContent.push({ type:'text', text: prompt });
 
-    const geminiBody = {
-      contents: [{ parts }],
-      generationConfig: { maxOutputTokens: 4000, temperature: 0.2 }
+    const openAIBody = {
+      model: 'gpt-4o',
+      max_tokens: 4000,
+      messages: [{ role:'user', content: msgContent }]
     };
-
-    const BASE = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=';
-    const key1 = await getGeminiKey();
-    const key2 = await getGeminiKey2();
-    if(!key1 && !key2) throw new Error('Could not decrypt Gemini keys.');
 
     let resp;
     try{
-      if(key1){
-        resp = await fetch(BASE + key1, { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(geminiBody) });
-        if(resp.status === 429 && key2){
-          setEstStatus('Rate limit hit — trying backup key…');
-          resp = await fetch(BASE + key2, { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(geminiBody) });
-        }
-      } else {
-        resp = await fetch(BASE + key2, { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(geminiBody) });
-      }
+      resp = await fetch('https://api.openai.com/v1/chat/completions', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer ' + openAIKey
+        },
+        body: JSON.stringify(openAIBody)
+      });
     }catch(e){
       throw new Error('Network error: ' + e.message);
     }
 
     if(!resp.ok){
       const errBody = await resp.text();
-      throw new Error('Gemini error ' + resp.status + ': ' + errBody.slice(0,300));
+      throw new Error('OpenAI error ' + resp.status + ': ' + errBody.slice(0,300));
     }
     const data = await resp.json();
-    const text = data.candidates?.[0]?.content?.parts?.[0]?.text || '';
-    if(!text) throw new Error('Empty response from Gemini: ' + JSON.stringify(data).slice(0,200));
+    const text = data.choices?.[0]?.message?.content || '';
+    if(!text) throw new Error('Empty response from OpenAI: ' + JSON.stringify(data).slice(0,200));
     
     // parse JSON from response
     const jsonMatch = text.match(/\{[\s\S]*\}/);
