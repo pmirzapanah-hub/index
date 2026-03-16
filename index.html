@@ -3253,27 +3253,20 @@ Rules:
 
     setEstStatus('Sending to AI… (this may take 15-30 seconds)');
 
-    // Try direct first, then fall back through proxies
-    const proxies = [
-      ANTHROPIC_URL,
-      'https://api.allorigins.win/raw?url=' + encodeURIComponent(ANTHROPIC_URL),
-      'https://corsproxy.io/?' + encodeURIComponent(ANTHROPIC_URL),
-    ];
+    // Route through Cloudflare Worker proxy (handles CORS)
+    const WORKER_URL = 'https://pah-proxy.p-mirzapanah.workers.dev';
 
-    let resp = null;
-    let lastErr = '';
-    for(const url of proxies){
-      try{
-        resp = await fetch(url, { method:'POST', headers, body: JSON.stringify(requestBody) });
-        if(resp.ok) break;
-        lastErr = 'HTTP ' + resp.status;
-        resp = null;
-      }catch(e){
-        lastErr = e.message;
-        resp = null;
-      }
+    setEstStatus('Sending to AI… this may take 20-30 seconds');
+    let resp;
+    try{
+      resp = await fetch(WORKER_URL, {
+        method: 'POST',
+        headers,
+        body: JSON.stringify(requestBody)
+      });
+    }catch(e){
+      throw new Error('Could not reach proxy: ' + e.message + '. Check your internet connection.');
     }
-    if(!resp) throw new Error('All endpoints failed. Last error: ' + lastErr + '. Please upload to GitHub Pages to use this feature.');
 
     if(!resp.ok){
       const errBody = await resp.text();
