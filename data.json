@@ -153,9 +153,9 @@
   "pricingDB": {
     "margin": 30,
     "labourRate": 85,
-    "odPath": "\"C:\\Users\\Paul\\OneDrive\\Jobs\\0 CRM Test\\VIP_Cabinets_Pricing.xlsx\"",
+    "odPath": "C:\\Users\\Paul\\OneDrive\\Jobs\\0 CRM Test\\VIP_Cabinets_Pricing.xlsx",
     "csvData": "",
     "items": []
   },
-  "savedAt": "2026-03-16T19:25:30.119Z"
+  "savedAt": "2026-03-16T19:25:46.031Z"
 }
