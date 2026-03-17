@@ -3268,9 +3268,15 @@ function renderItemResult(item){
           <div style="font-size:0.7rem;color:var(--text-dim)">Total Boards</div>
           <div style="font-size:0.65rem;color:var(--text-dim)">${bs.hmrParts||0} HMR + ${bs.colourParts||0} colour parts</div>
         </div>
-        <div style="background:var(--surface);border:1px solid var(--border2);border-radius:6px;padding:8px 14px;text-align:center;min-width:100px">
-          <div style="font-size:1.4rem;font-weight:700;color:var(--text)">${bs.edgeRolls||0}</div>
-          <div style="font-size:0.7rem;color:var(--text-dim)">Edge Tape Rolls</div>
+        <div style="background:var(--surface);border:1px solid var(--border2);border-radius:6px;padding:8px 14px;text-align:center;min-width:110px">
+          <div style="font-size:1.1rem;font-weight:700;color:var(--text)">${bs.whiteRolls||0} rolls</div>
+          <div style="font-size:0.7rem;color:var(--text-dim)">White Edge Tape</div>
+          <div style="font-size:0.65rem;color:var(--text-dim)">${bs.whiteEdgeM||0}m (carcass)</div>
+        </div>
+        <div style="background:var(--surface);border:1px solid var(--border2);border-radius:6px;padding:8px 14px;text-align:center;min-width:110px">
+          <div style="font-size:1.1rem;font-weight:700;color:var(--text)">${bs.colourRolls||0} rolls</div>
+          <div style="font-size:0.7rem;color:var(--text-dim)">Colour Edge Tape</div>
+          <div style="font-size:0.65rem;color:var(--text-dim)">${bs.colourEdgeM||0}m (doors)</div>
         </div>
       </div>
     </div>`;
@@ -3368,7 +3374,11 @@ function renderItemResult(item){
 
   // ── Build content by mode ──────────────────────────────────
   const allMats = est.materials||[];
-  let content = `<div style="font-size:0.78rem;color:var(--text-dim);margin-bottom:10px;background:var(--surface2);padding:8px 12px;border-radius:6px;line-height:1.6">${est.scope||''}</div>`;
+  const verifyNote = item.extracted?.notes || '';
+  let content = `
+    <div style="font-size:0.78rem;color:var(--text-dim);margin-bottom:10px;background:var(--surface2);padding:8px 12px;border-radius:6px;line-height:1.6">${est.scope||''}</div>
+    ${verifyNote ? `<div style="background:rgba(255,170,0,0.1);border:1px solid rgba(255,170,0,0.3);border-radius:6px;padding:8px 12px;margin-bottom:10px;font-size:0.76rem;color:var(--gold)">${verifyNote}</div>` : ''}
+    ${item.planDescription ? `<details style="margin-bottom:10px"><summary style="font-size:0.72rem;color:var(--text-dim);cursor:pointer;padding:6px 10px;background:var(--surface2);border-radius:6px">📋 View AI plan analysis (click to expand)</summary><div style="font-size:0.75rem;color:var(--text-dim);line-height:1.7;padding:10px 12px;border:1px solid var(--border2);border-radius:0 0 6px 6px;white-space:pre-wrap">${item.planDescription}</div></details>` : ''}`;
 
   if(mode==='summary')   content += summaryView() + labourSection();
   if(mode==='boards')    content += countBar + boardBar + matTable(allMats.filter(r=>['hmr','colour','other'].includes(r.category)),'Sheet Materials');
@@ -3435,75 +3445,153 @@ async function runItemEstimate(id){
   const margin=item.overrideMargin||PRICING_DB.margin||30;
   const labourRate=item.overrideLabour||PRICING_DB.labourRate||85;
   const pCtx=PRICING_DB.items.length?'PRICING DATABASE:\nSKU|Description|Unit|BulkPrice|LabourHrs|InstallCost|Margin%\n'+PRICING_DB.items.map(p=>`${p.sku}|${p.description}|${p.unit}|$${p.bulkPrice}|${p.labourHours}hrs|$${p.installCost}|${p.margin}%`).join('\n'):'Use reasonable Australian market rates.';
-  // Stage 1 prompt: AI extracts ONLY raw counts and measurements - no pricing, no calculation
-  // This is deterministic because it's just reading facts from the plan
-  const prompt=`You are reading a cabinet/joinery plan for VIP Cabinets Australia.
-Your ONLY job is to extract exact counts and measurements from the plan. Do NOT calculate prices.
+  try{
+    const apiKey = await getOpenAIKey();
+    if(!apiKey) throw new Error('Could not decrypt OpenAI key.');
 
-AREA: ${item.name}
-PROJECT TYPE: ${item.type}
-${item.notes?'NOTES: '+item.notes:''}
+    // Helper: build file content array for API call
+    const buildContent = (fileId, textMsg) => {
+      if(item.fileType==='pdf'){
+        return [{type:'text',text:textMsg},{type:'file',file:{file_id:fileId}}];
+      } else {
+        const mime=(['image/jpeg','image/png','image/gif','image/webp'].includes(item.mimeType||''))?item.mimeType:'image/jpeg';
+        return [{type:'image_url',image_url:{url:'data:'+mime+';base64,'+item.fileData,detail:'high'}},{type:'text',text:textMsg}];
+      }
+    };
 
-Extract every item you can see. For cabinet widths use standard sizes (300/400/450/500/600/750/900/1000/1200mm).
+    // Upload PDF once, reuse file ID across all stages
+    let fileId = null;
+    if(item.fileType==='pdf'){
+      setS('Step 1/3 — Uploading PDF…');
+      const ba=atob(item.fileData); const arr=new Uint8Array(ba.length);
+      for(let i=0;i<ba.length;i++) arr[i]=ba.charCodeAt(i);
+      const fd=new FormData();
+      fd.append('file',new Blob([arr],{type:'application/pdf'}),'doc.pdf');
+      fd.append('purpose','assistants');
+      const ur=await fetch('https://api.openai.com/v1/files',{method:'POST',headers:{'Authorization':'Bearer '+apiKey},body:fd});
+      if(!ur.ok) throw new Error('PDF upload failed: '+(await ur.text()).slice(0,150));
+      fileId=(await ur.json()).id;
+    }
 
-Respond with ONLY this JSON, no markdown:
+    const callGPT = async (messages, maxTokens=2000) => {
+      const r = await fetch('https://api.openai.com/v1/chat/completions',{
+        method:'POST',
+        headers:{'Content-Type':'application/json','Authorization':'Bearer '+apiKey},
+        body:JSON.stringify({model:'gpt-4o',max_tokens:maxTokens,temperature:0,seed:42,messages})
+      });
+      if(!r.ok) throw new Error('OpenAI '+ r.status+': '+(await r.text()).slice(0,200));
+      return (await r.json()).choices?.[0]?.message?.content||'';
+    };
+
+    // ── STAGE 1: Deep visual description ──────────────────────
+    // Force AI to describe EVERYTHING it sees before extracting
+    setS('Step 1/3 — Reading plan in detail…');
+
+    const descPrompt = `You are a cabinet maker's estimator carefully reading a joinery/cabinet plan.
+
+Study this plan thoroughly. Then write a detailed description covering:
+1. Go through the plan LEFT TO RIGHT, TOP TO BOTTOM
+2. For EVERY cabinet you see, state: its position, type (base/wall/tall/vanity), exact width in mm, and what's on it (doors/drawers/open)
+3. Count every single door and every single drawer individually — do not group or skip
+4. Note the ceiling height if shown
+5. Note any benchtop runs with length in mm
+6. Note any appliance spaces (fridge, oven, dishwasher gaps)
+
+Be thorough. Do NOT skip anything. This description will be used to calculate materials.
+Write in plain text, not JSON. Be as specific as possible about dimensions.`;
+
+    const description = await callGPT(
+      [{role:'user', content: item.fileType==='pdf'
+        ? [{type:'text',text:descPrompt},{type:'file',file:{file_id:fileId}}]
+        : buildContent(null, descPrompt)
+      }],
+      1500
+    );
+
+    item.planDescription = description;
+    setS('Step 2/3 — Extracting cabinet data…');
+
+    // ── STAGE 2: Structured extraction from the description ──
+    // Now extract JSON from the description — NO image, just text
+    // This prevents re-interpretation and locks in the counts from Stage 1
+    const extractPrompt = `Based on this cabinet plan description, extract the exact cabinet data as JSON.
+
+DESCRIPTION:
+${description}
+
+RULES — follow exactly:
+- Each unique cabinet width gets its own entry with exact qty count
+- has_drawer: true ONLY if drawers are explicitly mentioned for that cabinet
+- has_door: true for all base/wall/vanity unless explicitly described as open/no-door
+- For tall cabinets: they always have 2 doors (top and bottom)  
+- qty must match the exact count in the description — recount if unsure
+- width_mm: use the exact mm from the description, or nearest standard (300/400/450/500/600/750/900/1000/1200)
+- ceiling_height_mm: extract from description or use 2400 as default
+- benchtop_lm: total run in linear metres (convert from mm if needed)
+
+Respond with ONLY valid JSON, no markdown, no explanation:
 {
-  "scope": "one sentence describing what you see in the plan",
+  "scope": "brief one-line summary of what was found",
   "cabinets": {
-    "base": [{"width_mm": 600, "qty": 1, "has_drawer": false, "has_door": true, "note": ""}],
-    "wall": [{"width_mm": 600, "qty": 1, "has_door": true, "note": ""}],
-    "tall": [{"width_mm": 600, "qty": 1, "note": ""}],
-    "vanity": [{"width_mm": 600, "qty": 1, "has_drawer": false, "note": ""}]
+    "base":   [{"width_mm": 600, "qty": 1, "has_drawer": false, "has_door": true, "note": "describe position"}],
+    "wall":   [{"width_mm": 600, "qty": 1, "has_door": true, "note": ""}],
+    "tall":   [{"width_mm": 600, "qty": 1, "note": ""}],
+    "vanity": [{"width_mm": 600, "qty": 1, "has_drawer": false, "has_door": true, "note": ""}]
   },
   "benchtop_lm": 0,
-  "splashback_m2": 0,
-  "extra_doors": 0,
-  "extra_drawers": 0,
   "ceiling_height_mm": 2400,
+  "total_doors_check": 0,
+  "total_drawers_check": 0,
   "notes": ""
 }
 
-Rules:
-- qty must be exact integer counts from the plan
-- width_mm must be exact dimension from the plan
-- benchtop_lm = total linear metres of benchtop visible
-- If you cannot see something clearly, use 0
-- Do NOT guess or estimate - only count what is visible`;
-  try{
-    const apiKey=await getOpenAIKey();
-    if(!apiKey) throw new Error('Could not decrypt OpenAI key.');
-    let resp;
-    if(item.fileType==='pdf'){
-      setS('Uploading PDF…');
-      const ba=atob(item.fileData); const arr=new Uint8Array(ba.length); for(let i=0;i<ba.length;i++) arr[i]=ba.charCodeAt(i);
-      const fd=new FormData(); fd.append('file',new Blob([arr],{type:'application/pdf'}),'doc.pdf'); fd.append('purpose','assistants');
-      const ur=await fetch('https://api.openai.com/v1/files',{method:'POST',headers:{'Authorization':'Bearer '+apiKey},body:fd});
-      if(!ur.ok) throw new Error('PDF upload: '+(await ur.text()).slice(0,150));
-      const ud=await ur.json();
-      setS('Analysing PDF…');
-      resp=await fetch('https://api.openai.com/v1/chat/completions',{method:'POST',headers:{'Content-Type':'application/json','Authorization':'Bearer '+apiKey},body:JSON.stringify({model:'gpt-4o',max_tokens:4000,temperature:0,seed:42,messages:[{role:'user',content:[{type:'text',text:prompt},{type:'file',file:{file_id:ud.id}}]}]})});
-      fetch('https://api.openai.com/v1/files/'+ud.id,{method:'DELETE',headers:{'Authorization':'Bearer '+apiKey}}).catch(()=>{});
-    } else {
-      const mime=(['image/jpeg','image/png','image/gif','image/webp'].includes(item.mimeType||''))?item.mimeType:'image/jpeg';
-      setS('Analysing image…');
-      resp=await fetch('https://api.openai.com/v1/chat/completions',{method:'POST',headers:{'Content-Type':'application/json','Authorization':'Bearer '+apiKey},body:JSON.stringify({model:'gpt-4o',max_tokens:4000,temperature:0,seed:42,messages:[{role:'user',content:[{type:'image_url',image_url:{url:'data:'+mime+';base64,'+item.fileData,detail:'high'}},{type:'text',text:prompt}]}]})});
-    }
-    if(!resp.ok) throw new Error('OpenAI '+resp.status+': '+(await resp.text()).slice(0,200));
-    const data=await resp.json();
-    const text=data.choices?.[0]?.message?.content||'';
-    if(!text) throw new Error('Empty response from AI');
-    const m=text.match(/\{[\s\S]*\}/);
-    if(!m) throw new Error('No JSON in response');
-    const extracted = JSON.parse(m[0]);
+After filling in cabinets, verify: count all doors and drawers from your cabinet entries and put totals in total_doors_check and total_drawers_check.`;
 
-    // Stage 2: Deterministic calculation in JavaScript
-    // All pricing, quantities, and totals calculated here — never by AI
+    const extractText = await callGPT([{role:'user',content:[{type:'text',text:extractPrompt}]}], 1500);
+    const m1 = extractText.match(/\{[\s\S]*\}/);
+    if(!m1) throw new Error('No JSON in extraction response');
+    const extracted = JSON.parse(m1[0]);
+
+    // ── STAGE 3: Verify counts match ─────────────────────────
+    // Cross-check AI's own door/drawer count against what we'll calculate
+    setS('Step 3/3 — Verifying counts…');
+
+    // Calculate what we expect from the extracted data
+    const cab = extracted.cabinets||{};
+    let expectedDoors=0, expectedDrawers=0;
+    (cab.base||[]).forEach(c=>{
+      if(c.has_door!==false) expectedDoors+=(c.qty||1)*((c.width_mm||600)>=900?2:1);
+      if(c.has_drawer) expectedDrawers+=(c.qty||1);
+    });
+    (cab.wall||[]).forEach(c=>{ expectedDoors+=(c.qty||1)*((c.width_mm||600)>=900?2:1); });
+    (cab.tall||[]).forEach(c=>{ expectedDoors+=(c.qty||1)*2; });
+    (cab.vanity||[]).forEach(c=>{
+      if(c.has_door!==false) expectedDoors+=(c.qty||1)*((c.width_mm||600)>=900?2:1);
+      if(c.has_drawer) expectedDrawers+=(c.qty||1);
+    });
+
+    // If AI's own check count differs from what we calculated, flag it
+    const aiDoors   = extracted.total_doors_check   || 0;
+    const aiDrawers = extracted.total_drawers_check || 0;
+    let verifyNote  = '';
+    if(aiDoors>0 && Math.abs(aiDoors-expectedDoors)>1){
+      verifyNote += `⚠️ Door count mismatch: AI counted ${aiDoors}, calculated ${expectedDoors}. `;
+    }
+    if(aiDrawers>0 && Math.abs(aiDrawers-expectedDrawers)>0){
+      verifyNote += `⚠️ Drawer count mismatch: AI counted ${aiDrawers}, calculated ${expectedDrawers}. `;
+    }
+    if(verifyNote) extracted.notes = (extracted.notes||'') + ' ' + verifyNote;
+
+    // Clean up uploaded file
+    if(fileId) fetch('https://api.openai.com/v1/files/'+fileId,{method:'DELETE',headers:{'Authorization':'Bearer '+apiKey}}).catch(()=>{});
+
+    // ── STAGE 4: Deterministic JS calculation ─────────────────
     item.estimate = calculateEstimateFromPlan(extracted, margin, labourRate, item.displayMode||'summary', {
       machineRate:  item.machineRate  || PRICING_DB.machineRate  || 60,
       assemblyRate: item.assemblyRate || PRICING_DB.assemblyRate || 85
     });
-    item.extracted = extracted; // save raw extraction
-    item.status='done';
+    item.extracted = extracted;
+    item.status = 'done';
     toast('✅ '+item.name+' estimated!');
   }catch(e){ item.status='error'; item.errorMsg=e.message; toast('❌ '+e.message.slice(0,60)); }
   renderEstimateItems(); updateCombinedTotal();
@@ -3749,7 +3837,31 @@ function calculateEstimateFromPlan(plan, margin, labourRate, displayMode, rates=
   // ── STEP 3: Pricing ───────────────────────────────────────
   const hmrPrice    = getPrice('16mm HMR', getPrice('16mm Melamine', 58));
   const colourPrice = getPrice('18mm Melamine', 65);
-  const edgeRolls   = Math.ceil(totalBoards * 0.4);
+  // ── EDGE TAPE CALCULATION ────────────────────────────────
+  // Rules: doors=4 sides colour tape, panels/sides=1 long+1 short white, shelves=4 sides white
+  // Rolls are 50m each
+  let whiteEdgeMm = 0;   // HMR carcass parts
+  let colourEdgeMm = 0;  // Doors and drawer fronts
+
+  // White edge: sides (1 long + 1 short each), tops/bottoms/shelves (all 4 sides)
+  for(const p of allHMRParts){
+    const isShelf = p.label.includes('shelf') || p.label.includes('top') || p.label.includes('bottom') || p.label.includes('rail');
+    if(isShelf){
+      whiteEdgeMm += 2*p.w + 2*p.h; // 4 sides
+    } else {
+      whiteEdgeMm += p.h + p.w; // 1 long + 1 short side (backs typically not edged)
+    }
+  }
+  // Colour edge: all 4 sides on every door/drawer front
+  for(const p of allColourParts){
+    colourEdgeMm += 2*p.w + 2*p.h;
+  }
+
+  const ROLL_METRES = 50000; // 50m roll = 50,000mm
+  const whiteRolls  = Math.ceil(whiteEdgeMm  / ROLL_METRES) || 0;
+  const colourRolls = Math.ceil(colourEdgeMm / ROLL_METRES) || 0;
+  const whiteEdgeM  = Math.round(whiteEdgeMm  / 100) / 10; // metres for display
+  const colourEdgeM = Math.round(colourEdgeMm / 100) / 10;
 
   const fmt2 = n => Math.round(n*100)/100;
 
@@ -3762,7 +3874,8 @@ function calculateEstimateFromPlan(plan, margin, labourRate, displayMode, rates=
   // Sheet materials
   add('PANEL-16', '16mm HMR Board (2400×1200mm)',         hmrSheets,    'sheet', hmrPrice,    'hmr');
   add('PANEL-18', '18mm Colour Board (2400×1200mm)',       colourSheets, 'sheet', colourPrice, 'colour');
-  add('EDGETAPE',  'Edge Tape 22mm Roll',                  edgeRolls,    'roll',  getPrice('Edge Tape',18), 'other');
+  if(whiteRolls)  add('EDGETAPE-W', `White Edge Tape 22mm (${whiteEdgeM}m — carcass/HMR)`,   whiteRolls,  'roll', getPrice('Edge Tape',18), 'edgetape');
+  if(colourRolls) add('EDGETAPE-C', `Colour Edge Tape 22mm (${colourEdgeM}m — doors/panels)`, colourRolls, 'roll', getPrice('Edge Tape',18), 'edgetape');
 
   // Hardware
   if(totalHinges)  add('HINGE-SC',  'Soft Close Hinge',           totalHinges,  'pair', getPrice('Soft Close Hinge',12),    'hardware');
@@ -3799,7 +3912,7 @@ function calculateEstimateFromPlan(plan, margin, labourRate, displayMode, rates=
     materials, labour,
     subtotalMaterials, subtotalLabour,
     marginRate:margin, marginAmount, grandTotal,
-    boardSummary:    {hmrSheets, colourSheets, totalBoards, edgeRolls, hmrParts:allHMRParts.length, colourParts:allColourParts.length},
+    boardSummary:    {hmrSheets, colourSheets, totalBoards, whiteRolls, colourRolls, whiteEdgeM, colourEdgeM, hmrParts:allHMRParts.length, colourParts:allColourParts.length},
     hardwareSummary: {doors:totalDoors, drawers:totalDrawers, hinges:totalHinges, slides:totalSlides, handles:totalHandles, legs:totalLegs},
     extractedCounts: {base:totalBase, wall:totalWall, tall:totalTall, vanity:totalVanity, total:totalCabs},
     labourSummary:   {machineHrs, assemblyHrs, installHrs, machineRate:machinRate, assemblyRate}
