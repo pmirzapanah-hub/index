@@ -3177,13 +3177,25 @@ function renderEstimateItems(){
           <input type="file" accept=".pdf,image/*,.heic,.heif" style="display:block;width:100%;padding:6px;background:var(--surface);border:1px solid var(--border);border-radius:6px;color:var(--text);font-size:0.82rem"
             onchange="handleItemFile(${item.id},this.files[0])"/>
         </div>
-        <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;margin-bottom:12px">
+        <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;margin-bottom:8px">
           <div><label style="font-size:0.72rem;color:var(--text-dim);display:block;margin-bottom:3px">Margin % override</label>
             <input class="modal-input" type="number" placeholder="Default: ${PRICING_DB.margin||30}%" id="item-margin-${item.id}" style="text-align:center" value="${item.overrideMargin||''}"/></div>
           <div><label style="font-size:0.72rem;color:var(--text-dim);display:block;margin-bottom:3px">Labour $/hr override</label>
             <input class="modal-input" type="number" placeholder="Default: $${PRICING_DB.labourRate||85}" id="item-labour-${item.id}" style="text-align:center" value="${item.overrideLabour||''}"/></div>
           <div><label style="font-size:0.72rem;color:var(--text-dim);display:block;margin-bottom:3px">Extra notes</label>
             <input class="modal-input" placeholder="e.g. stone benchtop" id="item-notes-${item.id}" value="${item.notes||''}"/></div>
+        </div>
+        <div style="display:flex;align-items:center;gap:10px;margin-bottom:12px">
+          <label style="font-size:0.72rem;color:var(--text-dim);white-space:nowrap">Show in estimate:</label>
+          <select class="modal-input" id="item-display-${item.id}" style="flex:1"
+            onchange="updateItemDisplay(${item.id},this.value)">
+            <option value="summary"     ${(item.displayMode||'summary')==='summary'    ?'selected':''}>📋 Materials cost summary</option>
+            <option value="boards"      ${item.displayMode==='boards'     ?'selected':''}>🪵 Sheet boards (doors, drawer fronts, panels)</option>
+            <option value="internals"   ${item.displayMode==='internals'  ?'selected':''}>📦 Cabinet internals (carcass, backs, shelves)</option>
+            <option value="hardware"    ${item.displayMode==='hardware'   ?'selected':''}>🔩 Hardware (hinges, slides, handles, legs)</option>
+            <option value="labour"      ${item.displayMode==='labour'     ?'selected':''}>👷 Labour breakdown</option>
+            <option value="full"        ${item.displayMode==='full'       ?'selected':''}>📊 Full breakdown (all of the above)</option>
+          </select>
         </div>
         ${item.status==='running'?`<div class="est-ai-status" style="display:flex;margin-bottom:12px"><div class="est-spinner"></div><span id="item-status-text-${item.id}">Analysing…</span></div>`:''}
         ${item.status==='error'?`<div style="background:rgba(248,81,73,0.1);border:1px solid rgba(248,81,73,0.3);border-radius:8px;padding:10px 14px;font-size:0.8rem;color:var(--red);margin-bottom:12px">❌ ${item.errorMsg||'Error'}</div>`:''}
@@ -3193,25 +3205,136 @@ function renderEstimateItems(){
 }
 
 function renderItemResult(item){
-  const est=item.estimate;
-  const margin=est.marginRate||PRICING_DB.margin||30;
-  const matRows=(est.materials||[]).map(r=>`<tr><td>${r.description}</td><td class="sku">${r.sku||'—'}</td><td style="text-align:center">${r.qty}</td><td style="text-align:center">${r.unit}</td><td style="text-align:right">$${parseFloat(r.unitPrice||0).toFixed(2)}</td><td style="text-align:right"><strong>$${parseFloat(r.total||0).toFixed(2)}</strong></td></tr>`).join('');
-  const labRows=(est.labour||[]).map(r=>`<tr><td>${r.task}</td><td style="text-align:center">${r.hours}hrs</td><td style="text-align:right">$${parseFloat(r.rate||0).toFixed(2)}/hr</td><td style="text-align:right"><strong>$${parseFloat(r.total||0).toFixed(2)}</strong></td></tr>`).join('');
+  const est  = item.estimate;
+  const mode = item.displayMode || 'summary';
+  const margin = est.marginRate || PRICING_DB.margin || 30;
+  const fmt = n => parseFloat(n||0).toFixed(2);
+  const fmtN = n => parseFloat(n||0).toLocaleString('en-AU',{minimumFractionDigits:2});
+  const bs = est.boardSummary || {};
+  const hs = est.hardwareSummary || {};
+  const ec = est.extractedCounts || {};
+
+  const matTable = (rows, title) => rows.length ? `
+    <div style="margin-bottom:10px">
+      ${title?`<div style="font-size:0.72rem;font-weight:700;color:var(--blue);text-transform:uppercase;letter-spacing:0.5px;margin-bottom:6px">${title}</div>`:''}
+      <div style="overflow-x:auto"><table class="est-table">
+        <thead><tr><th>Item</th><th>SKU</th><th>Qty</th><th>Unit</th><th>Unit Price</th><th>Total</th></tr></thead>
+        <tbody>${rows.map(r=>`<tr><td>${r.description}</td><td class="sku">${r.sku||'—'}</td><td style="text-align:center">${r.qty}</td><td style="text-align:center">${r.unit}</td><td style="text-align:right">$${fmt(r.unitPrice)}</td><td style="text-align:right"><strong>$${fmt(r.total)}</strong></td></tr>`).join('')}</tbody>
+      </table></div>
+    </div>` : '';
+
+  const labTable = () => `
+    <div style="margin-bottom:10px">
+      <div style="font-size:0.72rem;font-weight:700;color:var(--blue);text-transform:uppercase;letter-spacing:0.5px;margin-bottom:6px">Labour</div>
+      <div style="overflow-x:auto"><table class="est-table">
+        <thead><tr><th>Task</th><th>Hours</th><th>Rate</th><th>Total</th></tr></thead>
+        <tbody>${(est.labour||[]).map(r=>`<tr><td>${r.task}</td><td style="text-align:center">${r.hours}hrs</td><td style="text-align:right">$${fmt(r.rate)}/hr</td><td style="text-align:right"><strong>$${fmt(r.total)}</strong></td></tr>`).join('')}
+        <tr style="font-weight:700;border-top:1px solid var(--border)"><td colspan="3" style="color:var(--text-dim);font-size:0.78rem">Labour Subtotal</td><td style="text-align:right">$${fmt(est.subtotalLabour)}</td></tr></tbody>
+      </table></div>
+    </div>`;
+
+  const infoBox = () => `
+    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(110px,1fr));gap:8px;margin-bottom:12px">
+      ${ec.base?`<div style="background:var(--surface2);border-radius:6px;padding:8px;text-align:center"><div style="font-size:1.1rem;font-weight:700;color:var(--blue)">${ec.base}</div><div style="font-size:0.68rem;color:var(--text-dim)">Base Cabs</div></div>`:''}
+      ${ec.wall?`<div style="background:var(--surface2);border-radius:6px;padding:8px;text-align:center"><div style="font-size:1.1rem;font-weight:700;color:var(--blue)">${ec.wall}</div><div style="font-size:0.68rem;color:var(--text-dim)">Wall Cabs</div></div>`:''}
+      ${ec.tall?`<div style="background:var(--surface2);border-radius:6px;padding:8px;text-align:center"><div style="font-size:1.1rem;font-weight:700;color:var(--blue)">${ec.tall}</div><div style="font-size:0.68rem;color:var(--text-dim)">Tall Cabs</div></div>`:''}
+      ${ec.vanity?`<div style="background:var(--surface2);border-radius:6px;padding:8px;text-align:center"><div style="font-size:1.1rem;font-weight:700;color:var(--blue)">${ec.vanity}</div><div style="font-size:0.68rem;color:var(--text-dim)">Vanity Cabs</div></div>`:''}
+      ${hs.doors?`<div style="background:var(--surface2);border-radius:6px;padding:8px;text-align:center"><div style="font-size:1.1rem;font-weight:700;color:var(--gold)">${hs.doors}</div><div style="font-size:0.68rem;color:var(--text-dim)">Doors</div></div>`:''}
+      ${hs.drawers?`<div style="background:var(--surface2);border-radius:6px;padding:8px;text-align:center"><div style="font-size:1.1rem;font-weight:700;color:var(--gold)">${hs.drawers}</div><div style="font-size:0.68rem;color:var(--text-dim)">Drawers</div></div>`:''}
+    </div>`;
+
+  const boardsSection = () => `
+    <div style="margin-bottom:12px">
+      <div style="font-size:0.72rem;font-weight:700;color:var(--blue);text-transform:uppercase;letter-spacing:0.5px;margin-bottom:8px">🪵 Sheet Boards Required</div>
+      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:8px">
+        <div style="background:var(--surface2);border:1px solid var(--border2);border-radius:8px;padding:10px;text-align:center">
+          <div style="font-size:1.4rem;font-weight:700;color:var(--text)">${bs.doorBoards||0}</div>
+          <div style="font-size:0.72rem;color:var(--text-dim)">Sheets for Doors &<br>Drawer Fronts</div>
+        </div>
+        <div style="background:var(--surface2);border:1px solid var(--border2);border-radius:8px;padding:10px;text-align:center">
+          <div style="font-size:1.4rem;font-weight:700;color:var(--text)">${bs.internalBoards||0}</div>
+          <div style="font-size:0.72rem;color:var(--text-dim)">Sheets for Cabinet<br>Internals</div>
+        </div>
+        <div style="background:var(--surface2);border:1px solid var(--border2);border-radius:8px;padding:10px;text-align:center">
+          <div style="font-size:1.4rem;font-weight:700;color:var(--text)">${bs.backBoards||0}</div>
+          <div style="font-size:0.72rem;color:var(--text-dim)">Sheets for<br>Backing Boards</div>
+        </div>
+        <div style="background:var(--surface2);border:1px solid var(--border2);border-radius:8px;padding:10px;text-align:center">
+          <div style="font-size:1.4rem;font-weight:700;color:var(--text)">${bs.edgeTape||0}</div>
+          <div style="font-size:0.72rem;color:var(--text-dim)">Edge Tape<br>Rolls</div>
+        </div>
+      </div>
+      <div style="font-size:0.7rem;color:var(--text-dim);margin-top:6px">Based on 2400×1200mm sheets with 15% cutting waste allowance</div>
+    </div>`;
+
+  const hardwareSection = () => `
+    <div style="margin-bottom:12px">
+      <div style="font-size:0.72rem;font-weight:700;color:var(--blue);text-transform:uppercase;letter-spacing:0.5px;margin-bottom:8px">🔩 Hardware Count</div>
+      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:8px">
+        ${[
+          {v:hs.hinges, label:'Soft-Close\nHinges (pairs)'},
+          {v:hs.slides, label:'Drawer Slides\n(pairs)'},
+          {v:hs.handles,label:'Handles'},
+          {v:hs.legs,   label:'Adjustable\nLegs'},
+        ].map(({v,label})=>v?`<div style="background:var(--surface2);border:1px solid var(--border2);border-radius:8px;padding:10px;text-align:center"><div style="font-size:1.4rem;font-weight:700;color:var(--text)">${v}</div><div style="font-size:0.72rem;color:var(--text-dim)">${label.replace('\n','<br>')}</div></div>`:'').join('')}
+      </div>
+    </div>`;
+
+  // Build content based on display mode
+  const allMats = est.materials || [];
+  const doorMats     = allMats.filter(r=>r.category==='doors');
+  const internalMats = allMats.filter(r=>['internals','carcass'].includes(r.category));
+  const hardwareMats = allMats.filter(r=>r.category==='hardware');
+  const otherMats    = allMats.filter(r=>!['doors','internals','carcass','hardware'].includes(r.category));
+
+  let content = '';
+  if(mode==='summary' || mode==='full') content += infoBox();
+  if(mode==='boards'   || mode==='full') content += boardsSection();
+  if(mode==='hardware' || mode==='full') content += hardwareSection();
+  if(mode==='summary'){
+    content += matTable(allMats, 'All Materials');
+  }
+  if(mode==='boards'){
+    content += matTable([...doorMats,...internalMats.filter(r=>r.category==='internals')], 'Sheet Materials');
+  }
+  if(mode==='internals'){
+    content += boardsSection();
+    content += matTable(internalMats, 'Cabinet Internals');
+  }
+  if(mode==='hardware'){
+    content += matTable(hardwareMats, 'Hardware Items');
+  }
+  if(mode==='labour') content += labTable();
+  if(mode==='full'){
+    content += matTable(doorMats, '🚪 Door & Drawer Fronts');
+    content += matTable(internalMats, '📦 Cabinet Internals');
+    content += matTable(hardwareMats, '🔩 Hardware');
+    if(otherMats.length) content += matTable(otherMats, '📐 Other Materials');
+    content += labTable();
+  }
+
   return `<div style="background:var(--surface);border-radius:8px;padding:14px;border:1px solid var(--border2)">
-    <div style="font-size:0.78rem;color:var(--text-dim);margin-bottom:10px;line-height:1.6">${est.scope||''}</div>
-    <div style="overflow-x:auto;margin-bottom:10px"><table class="est-table">
-      <thead><tr><th>Item</th><th>SKU</th><th>Qty</th><th>Unit</th><th>Unit Price</th><th>Total</th></tr></thead>
-      <tbody>${matRows}<tr style="font-weight:700;border-top:1px solid var(--border)"><td colspan="5" style="color:var(--text-dim);font-size:0.78rem">Materials Subtotal</td><td style="text-align:right">$${parseFloat(est.subtotalMaterials||0).toFixed(2)}</td></tr></tbody>
-    </table></div>
-    <div style="overflow-x:auto;margin-bottom:10px"><table class="est-table">
-      <thead><tr><th>Task</th><th>Hours</th><th>Rate</th><th>Total</th></tr></thead>
-      <tbody>${labRows}<tr style="font-weight:700;border-top:1px solid var(--border)"><td colspan="3" style="color:var(--text-dim);font-size:0.78rem">Labour Subtotal</td><td style="text-align:right">$${parseFloat(est.subtotalLabour||0).toFixed(2)}</td></tr></tbody>
-    </table></div>
-    <div style="display:flex;justify-content:space-between;align-items:center;background:rgba(56,139,253,0.08);border:1px solid rgba(56,139,253,0.2);border-radius:8px;padding:10px 14px">
+    <div style="font-size:0.78rem;color:var(--text-dim);margin-bottom:12px;line-height:1.6;background:var(--surface2);padding:8px 12px;border-radius:6px">${est.scope||''}</div>
+    ${content}
+    <div style="display:flex;justify-content:space-between;align-items:center;background:rgba(56,139,253,0.08);border:1px solid rgba(56,139,253,0.2);border-radius:8px;padding:10px 14px;margin-top:8px">
       <div style="font-size:0.82rem;color:var(--text-dim)">Area Total (incl. ${margin}% margin)</div>
-      <div style="font-family:'Orbitron',monospace;font-size:1.1rem;font-weight:700;color:var(--blue)">AUD $${parseFloat(est.grandTotal||0).toLocaleString('en-AU',{minimumFractionDigits:2})}</div>
+      <div style="font-family:'Orbitron',monospace;font-size:1.1rem;font-weight:700;color:var(--blue)">AUD $${fmtN(est.grandTotal)}</div>
     </div>
   </div>`;
+}
+
+function updateItemDisplay(id, mode){
+  const item = estimateItems.find(i=>i.id===id);
+  if(!item) return;
+  item.displayMode = mode;
+  // If already estimated, re-render with new display mode
+  if(item.estimate && item.extracted){
+    const margin = item.overrideMargin || PRICING_DB.margin || 30;
+    const labourRate = item.overrideLabour || PRICING_DB.labourRate || 85;
+    item.estimate = calculateEstimateFromPlan(item.extracted, margin, labourRate, mode);
+    renderEstimateItems();
+    updateCombinedTotal();
+  }
 }
 
 function handleItemFile(id,file){
@@ -3254,44 +3377,40 @@ async function runItemEstimate(id){
   const margin=item.overrideMargin||PRICING_DB.margin||30;
   const labourRate=item.overrideLabour||PRICING_DB.labourRate||85;
   const pCtx=PRICING_DB.items.length?'PRICING DATABASE:\nSKU|Description|Unit|BulkPrice|LabourHrs|InstallCost|Margin%\n'+PRICING_DB.items.map(p=>`${p.sku}|${p.description}|${p.unit}|$${p.bulkPrice}|${p.labourHours}hrs|$${p.installCost}|${p.margin}%`).join('\n'):'Use reasonable Australian market rates.';
-  const prompt=`You are a cabinet making and joinery estimator for VIP Cabinets in Australia.
-Analyse the uploaded ${item.fileType==='pdf'?'PDF document':'image'} carefully and produce a detailed, consistent estimate.
+  // Stage 1 prompt: AI extracts ONLY raw counts and measurements - no pricing, no calculation
+  // This is deterministic because it's just reading facts from the plan
+  const prompt=`You are reading a cabinet/joinery plan for VIP Cabinets Australia.
+Your ONLY job is to extract exact counts and measurements from the plan. Do NOT calculate prices.
 
 AREA: ${item.name}
 PROJECT TYPE: ${item.type}
-LABOUR RATE: AUD $${labourRate}/hr (use this exact rate for all labour)
-MARGIN: ${margin}% (apply to grand total only)
-${item.notes?'CLIENT NOTES: '+item.notes:''}
+${item.notes?'NOTES: '+item.notes:''}
 
-${pCtx}
+Extract every item you can see. For cabinet widths use standard sizes (300/400/450/500/600/750/900/1000/1200mm).
 
-INSTRUCTIONS — follow exactly to ensure consistent results:
-1. Count every visible cabinet, door, drawer, and hardware item from the plan
-2. For each material item: match to pricing database by keyword, use the BulkPrice as unitPrice
-3. For each labour task: use the exact hours from pricing database LabourHours column
-4. Calculate: total = qty * unitPrice for each material row
-5. Calculate: total = hours * rate for each labour row
-6. subtotalMaterials = sum of all material totals
-7. subtotalLabour = sum of all labour totals
-8. grandTotal = (subtotalMaterials + subtotalLabour) * (1 + ${margin} / 100)
-9. Round all dollar values to 2 decimal places
-10. Do NOT invent items not visible in the plan
-
-Respond with ONLY this JSON structure, no markdown, no explanation:
+Respond with ONLY this JSON, no markdown:
 {
-  "scope": "one sentence describing exactly what is being estimated",
-  "materials": [
-    {"sku": "from database or empty", "description": "exact item name", "qty": 0, "unit": "each", "unitPrice": 0.00, "total": 0.00}
-  ],
-  "labour": [
-    {"task": "exact task name", "hours": 0.0, "rate": ${labourRate}, "total": 0.00}
-  ],
-  "subtotalMaterials": 0.00,
-  "subtotalLabour": 0.00,
-  "marginRate": ${margin},
-  "marginAmount": 0.00,
-  "grandTotal": 0.00
-}`;
+  "scope": "one sentence describing what you see in the plan",
+  "cabinets": {
+    "base": [{"width_mm": 600, "qty": 1, "has_drawer": false, "has_door": true, "note": ""}],
+    "wall": [{"width_mm": 600, "qty": 1, "has_door": true, "note": ""}],
+    "tall": [{"width_mm": 600, "qty": 1, "note": ""}],
+    "vanity": [{"width_mm": 600, "qty": 1, "has_drawer": false, "note": ""}]
+  },
+  "benchtop_lm": 0,
+  "splashback_m2": 0,
+  "extra_doors": 0,
+  "extra_drawers": 0,
+  "ceiling_height_mm": 2400,
+  "notes": ""
+}
+
+Rules:
+- qty must be exact integer counts from the plan
+- width_mm must be exact dimension from the plan
+- benchtop_lm = total linear metres of benchtop visible
+- If you cannot see something clearly, use 0
+- Do NOT guess or estimate - only count what is visible`;
   try{
     const apiKey=await getOpenAIKey();
     if(!apiKey) throw new Error('Could not decrypt OpenAI key.');
@@ -3314,10 +3433,15 @@ Respond with ONLY this JSON structure, no markdown, no explanation:
     if(!resp.ok) throw new Error('OpenAI '+resp.status+': '+(await resp.text()).slice(0,200));
     const data=await resp.json();
     const text=data.choices?.[0]?.message?.content||'';
-    if(!text) throw new Error('Empty response');
+    if(!text) throw new Error('Empty response from AI');
     const m=text.match(/\{[\s\S]*\}/);
     if(!m) throw new Error('No JSON in response');
-    item.estimate=JSON.parse(m[0]);
+    const extracted = JSON.parse(m[0]);
+
+    // Stage 2: Deterministic calculation in JavaScript
+    // All pricing, quantities, and totals calculated here — never by AI
+    item.estimate = calculateEstimateFromPlan(extracted, margin, labourRate, item.displayMode||'summary');
+    item.extracted = extracted; // save raw extraction
     item.status='done';
     toast('✅ '+item.name+' estimated!');
   }catch(e){ item.status='error'; item.errorMsg=e.message; toast('❌ '+e.message.slice(0,60)); }
@@ -3340,6 +3464,225 @@ async function downloadCombinedPDF(){
   const sumRows=done.map(i=>`<tr><td style="padding:6px 10px">${i.name}</td><td style="padding:6px 10px;color:#666">${i.type}</td><td style="padding:6px 10px;text-align:right;font-weight:600">AUD $${parseFloat(i.estimate.grandTotal||0).toLocaleString('en-AU',{minimumFractionDigits:2})}</td></tr>`).join('');
   const html=`<!DOCTYPE html><html><head><meta charset="UTF-8"/><style>body{font-family:Arial,sans-serif;font-size:12px;color:#222;padding:40px;max-width:800px;margin:0 auto}h1{color:#1a237e;font-size:20px}table{width:100%;border-collapse:collapse}th{background:#1a237e;color:#fff;padding:6px 8px;text-align:left}td{border-bottom:1px solid #eee;padding:5px 8px}.grand{background:#1a237e;color:#fff;padding:14px 20px;border-radius:6px;display:flex;justify-content:space-between;margin:16px 0}.footer{text-align:center;font-size:10px;color:#999;border-top:1px solid #eee;padding-top:10px;margin-top:20px}</style></head><body><h1>VIP Cabinets — Combined Estimate</h1><p style="color:#666">${client} · ${address||'—'} · ${date}</p><h3 style="color:#1a237e">Summary</h3><table><thead><tr><th>Area</th><th>Type</th><th>Total</th></tr></thead><tbody>${sumRows}</tbody></table><div class="grand"><span>Combined Total (all areas, incl. margin)</span><strong style="font-size:18px">AUD $${grand.toLocaleString('en-AU',{minimumFractionDigits:2})}</strong></div><h3 style="color:#1a237e">Detailed Breakdown</h3>${sections}<div class="footer">Valid 30 days · All prices AUD · PAH Admin Panel</div></body></html>`;
   const w=window.open('','_blank'); w.document.write(html); w.document.close(); setTimeout(()=>w.print(),500);
+}
+
+// ── Deterministic calculation engine ──────────────────────
+// All numbers calculated from AI-extracted facts using fixed rules
+// Same input always = same output
+
+function getPricingItem(keyword){
+  const lower = keyword.toLowerCase();
+  return PRICING_DB.items.find(p => p.description.toLowerCase().includes(lower) || p.sku.toLowerCase().includes(lower)) || null;
+}
+
+function getPrice(keyword, fallback=0){
+  const p = getPricingItem(keyword);
+  return p ? p.bulkPrice : fallback;
+}
+
+function getLabourHours(keyword, fallback=1){
+  const p = getPricingItem(keyword);
+  return p ? p.labourHours : fallback;
+}
+
+// Board calculation rules (standard 2400x1200mm sheet = 2.88m2)
+const BOARD_WIDTH = 1200; // mm
+const BOARD_HEIGHT = 2400; // mm
+const BOARD_AREA = BOARD_WIDTH * BOARD_HEIGHT; // mm2
+const WASTE_FACTOR = 1.15; // 15% cutting waste
+
+function boardsNeeded(totalAreaMm2){
+  return Math.ceil(totalAreaMm2 * WASTE_FACTOR / BOARD_AREA);
+}
+
+function calculateEstimateFromPlan(plan, margin, labourRate, displayMode){
+  const materials = [];
+  const labour = [];
+  const boards = { doors:[], internals:[] };
+  const hardware = [];
+
+  const cab = plan.cabinets || {};
+  const baseCabs  = cab.base  || [];
+  const wallCabs  = cab.wall  || [];
+  const tallCabs  = cab.tall  || [];
+  const vanCabs   = cab.vanity|| [];
+
+  // ── CALCULATE BOARDS NEEDED ──────────────────────────────
+  // Door/drawer fronts board usage (18mm moisture resistant)
+  let doorFrontAreaMm2 = 0;
+  let cabinetInternalAreaMm2 = 0;
+
+  // Base cabinets
+  baseCabs.forEach(cab => {
+    const qty = cab.qty || 1;
+    const w = cab.width_mm || 600;
+    const h = 715; // standard base cab height (floor to bench)
+    const d = 560; // standard depth
+    const doorH = 680;
+
+    // Door fronts
+    if(cab.has_door) doorFrontAreaMm2 += w * doorH * qty;
+
+    // Drawer fronts (standard 170mm high)
+    if(cab.has_drawer) doorFrontAreaMm2 += w * 170 * qty;
+
+    // Internals: 2 sides + top + bottom + 1 shelf
+    const sideArea = h * d;
+    const horizArea = w * d;
+    cabinetInternalAreaMm2 += (2 * sideArea + 2 * horizArea + horizArea) * qty; // 2 sides + top + bottom + shelf
+  });
+
+  // Wall cabinets
+  wallCabs.forEach(cab => {
+    const qty = cab.qty || 1;
+    const w = cab.width_mm || 600;
+    const h = 700; // standard wall cab height
+    const d = 300;
+    const doorH = h - 30;
+
+    if(cab.has_door !== false) doorFrontAreaMm2 += w * doorH * qty;
+    const sideArea = h * d;
+    const horizArea = w * d;
+    cabinetInternalAreaMm2 += (2 * sideArea + 2 * horizArea + horizArea) * qty;
+  });
+
+  // Tall cabinets
+  tallCabs.forEach(cab => {
+    const qty = cab.qty || 1;
+    const w = cab.width_mm || 600;
+    const h = plan.ceiling_height_mm || 2400;
+    const d = 560;
+    doorFrontAreaMm2 += w * (h - 30) * qty;
+    const sideArea = h * d;
+    const horizArea = w * d;
+    cabinetInternalAreaMm2 += (2 * sideArea + 2 * horizArea + horizArea * 2) * qty; // extra shelf
+  });
+
+  // Vanity cabinets
+  vanCabs.forEach(cab => {
+    const qty = cab.qty || 1;
+    const w = cab.width_mm || 600;
+    const h = 720;
+    const d = 450;
+    if(cab.has_door !== false) doorFrontAreaMm2 += w * (h-30) * qty;
+    if(cab.has_drawer) doorFrontAreaMm2 += w * 170 * qty;
+    cabinetInternalAreaMm2 += (2*(h*d) + 2*(w*d) + w*d) * qty;
+  });
+
+  // Extra items
+  if(plan.extra_doors) doorFrontAreaMm2 += plan.extra_doors * 600 * 680;
+  if(plan.extra_drawers) doorFrontAreaMm2 += plan.extra_drawers * 600 * 170;
+
+  const doorBoardsNeeded    = boardsNeeded(doorFrontAreaMm2);
+  const internalBoardsNeeded = boardsNeeded(cabinetInternalAreaMm2);
+  const backBoardsNeeded    = boardsNeeded(cabinetInternalAreaMm2 * 0.35); // backs ~35% of internals area
+
+  // ── HARDWARE COUNTS ──────────────────────────────────────
+  let totalDoors = 0, totalDrawers = 0, totalHingesPerDoor = 2;
+  baseCabs.forEach(c=>{
+    if(c.has_door) totalDoors += (c.qty||1) * (c.width_mm>=900 ? 2 : 1);
+    if(c.has_drawer) totalDrawers += (c.qty||1);
+  });
+  wallCabs.forEach(c=>{ if(c.has_door!==false) totalDoors += (c.qty||1) * (c.width_mm>=900 ? 2 : 1); });
+  tallCabs.forEach(c=>{ totalDoors += (c.qty||1) * 2; });
+  vanCabs.forEach(c=>{
+    if(c.has_door!==false) totalDoors += (c.qty||1) * (c.width_mm>=900 ? 2 : 1);
+    if(c.has_drawer) totalDrawers += (c.qty||1);
+  });
+  if(plan.extra_doors) totalDoors += plan.extra_doors;
+  if(plan.extra_drawers) totalDrawers += plan.extra_drawers;
+
+  const totalHinges  = totalDoors * totalHingesPerDoor;
+  const totalSlides  = totalDrawers; // pair per drawer
+  const totalHandles = totalDoors + totalDrawers;
+  const totalCabLegs = (baseCabs.reduce((s,c)=>s+(c.qty||1),0) + vanCabs.reduce((s,c)=>s+(c.qty||1),0)) * 4;
+
+  // ── BUILD MATERIAL LINES ──────────────────────────────────
+  const addMat = (sku, desc, qty, unit, unitPrice, category) => {
+    if(qty <= 0) return;
+    materials.push({sku, description:desc, qty, unit, unitPrice:Math.round(unitPrice*100)/100, total:Math.round(qty*unitPrice*100)/100, category});
+  };
+
+  // Sheet boards
+  const boardPrice18 = getPrice('18mm Melamine', 65);
+  const boardPrice16 = getPrice('16mm Melamine', 58);
+  const backPrice    = getPrice('3mm HMR',       22);
+  const edgeTapeRolls = Math.ceil((doorBoardsNeeded + internalBoardsNeeded) * 0.5);
+
+  if(internalBoardsNeeded > 0){
+    addMat('PANEL-18', '18mm Melamine Panel (Cabinet Internals)', internalBoardsNeeded, 'sheet', boardPrice18, 'internals');
+    addMat('BACK-3',   '3mm HMR Backing Board', backBoardsNeeded, 'sheet', backPrice, 'internals');
+  }
+  if(doorBoardsNeeded > 0){
+    addMat('PANEL-18', '18mm Melamine Panel (Door/Drawer Fronts)', doorBoardsNeeded, 'sheet', boardPrice18, 'doors');
+  }
+  if(edgeTapeRolls > 0){
+    addMat('EDGETAPE', 'Edge Tape 22mm Roll', edgeTapeRolls, 'roll', getPrice('Edge Tape', 18), 'internals');
+  }
+
+  // Cabinet carcasses
+  const allCabs = [
+    ...baseCabs.map(c=>({...c,type:'base'})),
+    ...wallCabs.map(c=>({...c,type:'wall'})),
+    ...tallCabs.map(c=>({...c,type:'tall'})),
+    ...vanCabs.map(c=>({...c,type:'vanity'}))
+  ];
+  allCabs.forEach(cab => {
+    const w = cab.width_mm || 600;
+    const sizeLabel = `${w}mm`;
+    let sku, desc, price;
+    if(cab.type==='base')   { sku=`CAB-B${w}`; desc=`Base Cabinet ${sizeLabel}`;    price=getPrice(`Base Cabinet ${sizeLabel}`,  w<500?195:w<700?280:w<1000?340:420); }
+    else if(cab.type==='wall')  { sku=`CAB-W${w}`; desc=`Wall Cabinet ${sizeLabel}`;    price=getPrice(`Wall Cabinet ${sizeLabel}`,  w<500?150:w<700?195:w<1000?240:295); }
+    else if(cab.type==='tall')  { sku=`CAB-T${w}`; desc=`Tall Pantry ${sizeLabel}`;     price=getPrice(`Tall Pantry ${sizeLabel}`,    w<700?520:640); }
+    else                        { sku=`VAN-${w}`;  desc=`Vanity Cabinet ${sizeLabel}`;  price=getPrice(`Vanity Cabinet ${sizeLabel}`,w<700?320:w<1000?390:480); }
+    addMat(sku, desc, cab.qty||1, 'each', price, 'carcass');
+  });
+
+  // Benchtop
+  if(plan.benchtop_lm > 0){
+    const btPrice = getPrice('Laminate Benchtop', 95);
+    addMat('BENCH-LAM', 'Laminate Benchtop', plan.benchtop_lm, 'lm', btPrice, 'benchtop');
+  }
+
+  // Hardware
+  if(totalHinges > 0)   addMat('HINGE-SC',  `Soft Close Hinge (${totalHinges} hinges for ${totalDoors} doors)`, totalHinges, 'pair', getPrice('Soft Close Hinge', 12), 'hardware');
+  if(totalSlides > 0)   addMat('SLIDE-SC',  `Soft Close Drawer Slide (${totalDrawers} drawers)`, totalSlides, 'pair', getPrice('Soft Close Drawer', 28), 'hardware');
+  if(totalHandles > 0)  addMat('HANDLE-BAR',`Bar Handle 160mm (${totalDoors} doors + ${totalDrawers} drawers)`, totalHandles, 'each', getPrice('Bar Handle', 8), 'hardware');
+  if(totalCabLegs > 0)  addMat('LEG-ADJ',   `Adjustable Cabinet Leg`, totalCabLegs, 'each', getPrice('Adjustable', 3), 'hardware');
+
+  // ── LABOUR ────────────────────────────────────────────────
+  const totalCabQty = allCabs.reduce((s,c)=>s+(c.qty||1), 0);
+  const addLab = (task, hours) => {
+    if(hours <= 0) return;
+    const total = Math.round(hours * labourRate * 100) / 100;
+    labour.push({task, hours:Math.round(hours*10)/10, rate:labourRate, total});
+  };
+
+  addLab('Site measure & assess',     2);
+  addLab('Delivery & unpack',         Math.ceil(totalCabQty / 5));
+  addLab('Cabinet installation',      totalCabQty * getLabourHours('Cabinet installation', 1.5));
+  if(totalDoors > 0)   addLab('Door fitting & adjustment', totalDoors * getLabourHours('Door fitting', 0.3));
+  if(totalDrawers > 0) addLab('Drawer fitting',           totalDrawers * getLabourHours('Drawer fitting', 0.3));
+  if(totalHandles > 0) addLab('Hardware installation',    totalHandles * getLabourHours('Hardware installation', 0.1));
+  if(plan.benchtop_lm > 0) addLab('Benchtop installation', plan.benchtop_lm * getLabourHours('Benchtop', 0.5));
+  addLab('Final adjustments & clean', Math.max(1, Math.ceil(totalCabQty / 8)));
+
+  // ── TOTALS (deterministic) ────────────────────────────────
+  const subtotalMaterials = Math.round(materials.reduce((s,r)=>s+r.total,0) * 100) / 100;
+  const subtotalLabour    = Math.round(labour.reduce((s,r)=>s+r.total,0) * 100) / 100;
+  const marginAmount      = Math.round((subtotalMaterials + subtotalLabour) * margin / 100 * 100) / 100;
+  const grandTotal        = Math.round((subtotalMaterials + subtotalLabour + marginAmount) * 100) / 100;
+
+  return {
+    scope: plan.scope || `${plan.cabinets ? Object.values(plan.cabinets).flat().reduce((s,c)=>s+(c.qty||1),0) : 0} cabinets estimated`,
+    materials, labour,
+    subtotalMaterials, subtotalLabour,
+    marginRate: margin, marginAmount, grandTotal,
+    // extra detail for display modes
+    boardSummary: { doorBoards:doorBoardsNeeded, internalBoards:internalBoardsNeeded, backBoards:backBoardsNeeded, edgeTape:edgeTapeRolls },
+    hardwareSummary: { doors:totalDoors, drawers:totalDrawers, hinges:totalHinges, slides:totalSlides, handles:totalHandles, legs:totalCabLegs },
+    extractedCounts: { base:baseCabs.reduce((s,c)=>s+(c.qty||1),0), wall:wallCabs.reduce((s,c)=>s+(c.qty||1),0), tall:tallCabs.reduce((s,c)=>s+(c.qty||1),0), vanity:vanCabs.reduce((s,c)=>s+(c.qty||1),0) }
+  };
 }
 
 function clearEstimate(){
