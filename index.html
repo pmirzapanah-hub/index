@@ -3161,7 +3161,11 @@ function renderEstimateItems(){
         </div>
         <div class="est-item-actions">
           ${item.estimate?`<span class="est-item-total-badge">AUD $${parseFloat(item.estimate.grandTotal||0).toLocaleString('en-AU',{minimumFractionDigits:2})}</span>`:''}
-          <button class="btn btn-primary btn-sm" onclick="event.stopPropagation();runItemEstimate(${item.id})" ${!item.fileData?'disabled':''}>🤖 Estimate</button>
+          ${item.extracted
+            ? `<button class="btn btn-ghost btn-sm" onclick="event.stopPropagation();reReadPlan(${item.id})" title="Re-read plan from scratch">🔄 Re-read</button>
+               <button class="btn btn-primary btn-sm" onclick="event.stopPropagation();calculateFromExtracted(${item.id})">🧮 Calculate</button>`
+            : `<button class="btn btn-primary btn-sm" onclick="event.stopPropagation();readPlan(${item.id})" ${!item.fileData?'disabled':''}>🤖 Read Plan</button>`
+          }
           <button class="btn btn-danger btn-sm" onclick="event.stopPropagation();removeEstimateItem(${item.id})">✕</button>
         </div>
       </div>
@@ -3207,9 +3211,127 @@ function renderEstimateItems(){
         </div>
         ${item.status==='running'?`<div class="est-ai-status" style="display:flex;margin-bottom:12px"><div class="est-spinner"></div><span id="item-status-text-${item.id}">Analysing…</span></div>`:''}
         ${item.status==='error'?`<div style="background:rgba(248,81,73,0.1);border:1px solid rgba(248,81,73,0.3);border-radius:8px;padding:10px 14px;font-size:0.8rem;color:var(--red);margin-bottom:12px">❌ ${item.errorMsg||'Error'}</div>`:''}
-        ${item.estimate?renderItemResult(item):''}
+        ${item.extracted && !item.estimate ? renderCabinetReview(item) : ''}
+        ${item.estimate ? renderItemResult(item) : ''}
       </div>
     </div>`).join('');
+}
+
+// ── Cabinet review table (shown after AI reads, before calculating) ─
+function renderCabinetReview(item){
+  if(!item.extracted) return '';
+  const cab = item.extracted.cabinets||{};
+  const allEntries = [
+    ...(cab.base||[]).map(e=>({...e,type:'base',label:'Base Cabinet'})),
+    ...(cab.wall||[]).map(e=>({...e,type:'wall',label:'Overhead/Wall Cabinet'})),
+    ...(cab.tall||[]).map(e=>({...e,type:'tall',label:'Tall Cabinet'})),
+    ...(cab.vanity||[]).map(e=>({...e,type:'vanity',label:'Vanity Cabinet'})),
+  ];
+
+  const totalCabs = allEntries.reduce((s,e)=>s+(e.qty||1),0);
+  let totalDoors=0, totalDrawers=0;
+  allEntries.forEach(e=>{
+    const qty=e.qty||1, w=e.width_mm||600;
+    if(e.type==='tall') totalDoors+=qty*2;
+    else if(e.has_door!==false) totalDoors+=qty*(w>=900?2:1);
+    if(e.has_drawer) totalDrawers+=qty;
+  });
+
+  const warn = item.extracted.notes||'';
+  const rows = allEntries.map((e,idx)=>`
+    <tr>
+      <td><select class="modal-input" style="padding:3px 6px;font-size:0.78rem" onchange="updateExtracted(${item.id},${idx},'type',this.value)">
+        ${['base','wall','tall','vanity'].map(t=>`<option ${t===e.type?'selected':''}>${t}</option>`).join('')}
+      </select></td>
+      <td><input type="number" class="modal-input" style="padding:3px 6px;font-size:0.78rem;text-align:center;width:80px" value="${e.width_mm||600}" onchange="updateExtracted(${item.id},${idx},'width_mm',+this.value)"/></td>
+      <td><input type="number" class="modal-input" style="padding:3px 6px;font-size:0.78rem;text-align:center;width:55px" value="${e.qty||1}" min="1" onchange="updateExtracted(${item.id},${idx},'qty',+this.value)"/></td>
+      <td style="text-align:center"><input type="checkbox" ${e.has_door!==false?'checked':''} onchange="updateExtracted(${item.id},${idx},'has_door',this.checked)" ${e.type==='tall'?'disabled':''}/>
+        ${e.type==='tall'?'<span style="font-size:0.7rem;color:var(--text-dim)">2×auto</span>':''}</td>
+      <td style="text-align:center"><input type="checkbox" ${e.has_drawer?'checked':''} onchange="updateExtracted(${item.id},${idx},'has_drawer',this.checked)" ${e.type==='wall'||e.type==='tall'?'disabled':''}/>
+      <td style="font-size:0.72rem;color:var(--text-dim)">${e.note||''}</td>
+      <td><button class="btn btn-danger btn-sm" style="padding:2px 8px;font-size:0.72rem" onclick="removeExtractedRow(${item.id},${idx})">✕</button></td>
+    </tr>`).join('');
+
+  return `
+    <div style="background:var(--surface2);border:1px solid var(--border2);border-radius:8px;padding:12px 14px;margin-bottom:12px">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
+        <div>
+          <div style="font-size:0.78rem;font-weight:700;color:var(--text)">✅ Plan read — review cabinets before calculating</div>
+          <div style="font-size:0.7rem;color:var(--text-dim);margin-top:2px">${totalCabs} cabinets · ${totalDoors} doors · ${totalDrawers} drawers — edit if anything looks wrong</div>
+        </div>
+        <button class="btn btn-primary btn-sm" onclick="calculateFromExtracted(${item.id})">🧮 Calculate Estimate</button>
+      </div>
+      ${warn?`<div style="background:rgba(255,170,0,0.1);border:1px solid rgba(255,170,0,0.3);border-radius:6px;padding:7px 10px;font-size:0.74rem;color:var(--gold);margin-bottom:10px">${warn}</div>`:''}
+      <div style="overflow-x:auto;margin-bottom:8px">
+        <table class="est-table" style="font-size:0.78rem">
+          <thead><tr><th>Type</th><th>Width (mm)</th><th>Qty</th><th>Door(s)</th><th>Drawer</th><th>Note</th><th></th></tr></thead>
+          <tbody id="review-tbody-${item.id}">${rows}</tbody>
+        </table>
+      </div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap">
+        <button class="btn btn-ghost btn-sm" onclick="addExtractedRow(${item.id},'base')">+ Base</button>
+        <button class="btn btn-ghost btn-sm" onclick="addExtractedRow(${item.id},'wall')">+ Wall</button>
+        <button class="btn btn-ghost btn-sm" onclick="addExtractedRow(${item.id},'tall')">+ Tall</button>
+        <button class="btn btn-ghost btn-sm" onclick="addExtractedRow(${item.id},'vanity')">+ Vanity</button>
+      </div>
+      ${item.planDescription?`
+      <details style="margin-top:10px"><summary style="font-size:0.72rem;color:var(--text-dim);cursor:pointer">📋 View AI plan description</summary>
+        <div style="font-size:0.74rem;color:var(--text-dim);line-height:1.7;padding:10px;border-top:1px solid var(--border2);margin-top:6px;white-space:pre-wrap;max-height:300px;overflow-y:auto">${item.planDescription}</div>
+      </details>`:''}
+    </div>`;
+}
+
+function updateExtracted(itemId, rowIdx, field, value){
+  const item = estimateItems.find(i=>i.id===itemId);
+  if(!item||!item.extracted) return;
+  const cab = item.extracted.cabinets;
+  const allTypes = ['base','wall','tall','vanity'];
+  let globalIdx = 0;
+  for(const type of allTypes){
+    const arr = cab[type]||[];
+    for(let i=0;i<arr.length;i++){
+      if(globalIdx===rowIdx){
+        if(field==='type'){
+          // Move row to different type array
+          const entry = {...arr[i], type:value};
+          arr.splice(i,1);
+          if(!cab[value]) cab[value]=[];
+          cab[value].push(entry);
+        } else {
+          arr[i][field] = value;
+        }
+        // Clear estimate so user knows they need to recalculate
+        item.estimate = null;
+        item.status = 'read';
+        renderEstimateItems();
+        return;
+      }
+      globalIdx++;
+    }
+  }
+}
+
+function removeExtractedRow(itemId, rowIdx){
+  const item = estimateItems.find(i=>i.id===itemId);
+  if(!item||!item.extracted) return;
+  const cab = item.extracted.cabinets;
+  let globalIdx=0;
+  for(const type of ['base','wall','tall','vanity']){
+    const arr=cab[type]||[];
+    for(let i=0;i<arr.length;i++){
+      if(globalIdx===rowIdx){ arr.splice(i,1); item.estimate=null; item.status='read'; renderEstimateItems(); return; }
+      globalIdx++;
+    }
+  }
+}
+
+function addExtractedRow(itemId, type){
+  const item = estimateItems.find(i=>i.id===itemId);
+  if(!item||!item.extracted) return;
+  if(!item.extracted.cabinets[type]) item.extracted.cabinets[type]=[];
+  item.extracted.cabinets[type].push({width_mm:600, qty:1, has_door:true, has_drawer:false, note:'added manually'});
+  item.estimate=null; item.status='read';
+  renderEstimateItems();
 }
 
 function renderItemResult(item){
@@ -3431,45 +3553,38 @@ function updateCombinedTotal(){
   valEl.textContent='AUD $'+grand.toLocaleString('en-AU',{minimumFractionDigits:2,maximumFractionDigits:2});
 }
 
-async function runItemEstimate(id){
-  const item=estimateItems.find(i=>i.id===id);
-  if(!item||!item.fileData) return;
+// ── Read plan (AI stage — runs ONCE, result cached) ─────────
+async function readPlan(id){
+  const item = estimateItems.find(i=>i.id===id);
+  if(!item || !item.fileData) return;
+
   item.overrideMargin  = parseFloat(document.getElementById('item-margin-'+id)?.value)||0;
   item.overrideLabour  = parseFloat(document.getElementById('item-labour-'+id)?.value)||0;
   item.machineRate     = parseFloat(document.getElementById('item-machinerate-'+id)?.value)||0;
   item.assemblyRate    = parseFloat(document.getElementById('item-assemblyrate-'+id)?.value)||0;
   item.notes           = document.getElementById('item-notes-'+id)?.value||'';
-  item.status='running'; item.errorMsg='';
+  item.status = 'running'; item.errorMsg = ''; item.estimate = null; item.extracted = null;
   renderEstimateItems();
-  const setS=t=>{ const el=document.getElementById('item-status-text-'+id); if(el) el.textContent=t; };
-  const margin=item.overrideMargin||PRICING_DB.margin||30;
-  const labourRate=item.overrideLabour||PRICING_DB.labourRate||85;
-  const pCtx=PRICING_DB.items.length?'PRICING DATABASE:\nSKU|Description|Unit|BulkPrice|LabourHrs|InstallCost|Margin%\n'+PRICING_DB.items.map(p=>`${p.sku}|${p.description}|${p.unit}|$${p.bulkPrice}|${p.labourHours}hrs|$${p.installCost}|${p.margin}%`).join('\n'):'Use reasonable Australian market rates.';
+
+  const setS = t => { const el=document.getElementById('item-status-text-'+id); if(el) el.textContent=t; };
+
   try{
     const apiKey = await getOpenAIKey();
     if(!apiKey) throw new Error('Could not decrypt OpenAI key.');
 
-    // Helper: build file content array for API call
-    const buildContent = (fileId, textMsg) => {
-      if(item.fileType==='pdf'){
-        return [{type:'text',text:textMsg},{type:'file',file:{file_id:fileId}}];
-      } else {
-        const mime=(['image/jpeg','image/png','image/gif','image/webp'].includes(item.mimeType||''))?item.mimeType:'image/jpeg';
-        return [{type:'image_url',image_url:{url:'data:'+mime+';base64,'+item.fileData,detail:'high'}},{type:'text',text:textMsg}];
-      }
-    };
+    const mime = (['image/jpeg','image/png','image/gif','image/webp'].includes(item.mimeType||''))?item.mimeType:'image/jpeg';
 
-    // Upload PDF once, reuse file ID across all stages
+    // Upload PDF once if needed
     let fileId = null;
     if(item.fileType==='pdf'){
-      setS('Step 1/3 — Uploading PDF…');
+      setS('Uploading PDF…');
       const ba=atob(item.fileData); const arr=new Uint8Array(ba.length);
       for(let i=0;i<ba.length;i++) arr[i]=ba.charCodeAt(i);
       const fd=new FormData();
       fd.append('file',new Blob([arr],{type:'application/pdf'}),'doc.pdf');
       fd.append('purpose','assistants');
       const ur=await fetch('https://api.openai.com/v1/files',{method:'POST',headers:{'Authorization':'Bearer '+apiKey},body:fd});
-      if(!ur.ok) throw new Error('PDF upload failed: '+(await ur.text()).slice(0,150));
+      if(!ur.ok) throw new Error('PDF upload: '+(await ur.text()).slice(0,150));
       fileId=(await ur.json()).id;
     }
 
@@ -3479,63 +3594,77 @@ async function runItemEstimate(id){
         headers:{'Content-Type':'application/json','Authorization':'Bearer '+apiKey},
         body:JSON.stringify({model:'gpt-4o',max_tokens:maxTokens,temperature:0,seed:42,messages})
       });
-      if(!r.ok) throw new Error('OpenAI '+ r.status+': '+(await r.text()).slice(0,200));
+      if(!r.ok) throw new Error('OpenAI '+r.status+': '+(await r.text()).slice(0,200));
       return (await r.json()).choices?.[0]?.message?.content||'';
     };
 
-    // ── STAGE 1: Deep visual description ──────────────────────
-    // Force AI to describe EVERYTHING it sees before extracting
-    setS('Step 1/3 — Reading plan in detail…');
+    const fileContent = item.fileType==='pdf'
+      ? [{type:'text',text:'__PROMPT__'},{type:'file',file:{file_id:fileId}}]
+      : [{type:'image_url',image_url:{url:'data:'+mime+';base64,'+item.fileData,detail:'high'}},{type:'text',text:'__PROMPT__'}];
 
-    const descPrompt = `You are a cabinet maker's estimator carefully reading a joinery/cabinet plan.
-
-Study this plan thoroughly. Then write a detailed description covering:
-1. Go through the plan LEFT TO RIGHT, TOP TO BOTTOM
-2. For EVERY cabinet you see, state: its position, type (base/wall/tall/vanity), exact width in mm, and what's on it (doors/drawers/open)
-3. Count every single door and every single drawer individually — do not group or skip
-4. Note the ceiling height if shown
-5. Note any benchtop runs with length in mm
-6. Note any appliance spaces (fridge, oven, dishwasher gaps)
-
-Be thorough. Do NOT skip anything. This description will be used to calculate materials.
-Write in plain text, not JSON. Be as specific as possible about dimensions.`;
-
-    const description = await callGPT(
-      [{role:'user', content: item.fileType==='pdf'
-        ? [{type:'text',text:descPrompt},{type:'file',file:{file_id:fileId}}]
-        : buildContent(null, descPrompt)
-      }],
-      1500
+    const withPrompt = (prompt) => fileContent.map(p =>
+      p.type==='text' && p.text==='__PROMPT__' ? {...p,text:prompt}
+      : p.type==='image_url' ? p
+      : p
     );
 
+    // ── STAGE 1: Thorough visual description ─────────────────
+    setS('Step 1/3 — Reading plan carefully…');
+    const descPrompt = `You are a professional cabinet maker reading a joinery/cabinet floor plan or elevation drawing.
+
+Study this plan VERY carefully. Then write a thorough description:
+
+1. Scan the entire plan systematically — left to right, top to bottom, section by section
+2. For EVERY cabinet unit you see:
+   - State its exact position (e.g. "left corner base cabinet")
+   - State its type: base / overhead (wall) / tall / vanity
+   - State its exact width in mm as shown on the plan
+   - State exactly what it has: door(s), drawer(s), or open shelf
+   - If it has a drawer bank, count each drawer individually
+3. Count every door separately — do not group
+4. Note any appliance gaps (fridge space, oven, dishwasher)
+5. Note benchtop runs with exact dimensions
+6. Note ceiling height if shown
+7. At the end, write a SUMMARY COUNT:
+   - Total base cabinets: X
+   - Total overhead/wall cabinets: X
+   - Total tall cabinets: X
+   - Total vanity cabinets: X
+   - Total doors: X
+   - Total drawers: X
+
+Be exhaustive. This description will be used to order materials so nothing can be missed.
+Write in plain text. Do not skip any cabinet.`;
+
+    const description = await callGPT([{role:'user',content:withPrompt(descPrompt)}], 2000);
     item.planDescription = description;
-    setS('Step 2/3 — Extracting cabinet data…');
 
-    // ── STAGE 2: Structured extraction from the description ──
-    // Now extract JSON from the description — NO image, just text
-    // This prevents re-interpretation and locks in the counts from Stage 1
-    const extractPrompt = `Based on this cabinet plan description, extract the exact cabinet data as JSON.
+    // ── STAGE 2: Extract structured JSON from description ─────
+    setS('Step 2/3 — Extracting cabinet list…');
+    const extractPrompt = `Based on this detailed cabinet plan description, extract the exact cabinet data.
 
-DESCRIPTION:
+DESCRIPTION TO EXTRACT FROM:
+---
 ${description}
+---
 
-RULES — follow exactly:
-- Each unique cabinet width gets its own entry with exact qty count
-- has_drawer: true ONLY if drawers are explicitly mentioned for that cabinet
-- has_door: true for all base/wall/vanity unless explicitly described as open/no-door
-- For tall cabinets: they always have 2 doors (top and bottom)  
-- qty must match the exact count in the description — recount if unsure
-- width_mm: use the exact mm from the description, or nearest standard (300/400/450/500/600/750/900/1000/1200)
-- ceiling_height_mm: extract from description or use 2400 as default
-- benchtop_lm: total run in linear metres (convert from mm if needed)
+EXTRACTION RULES:
+- Use the SUMMARY COUNT at the bottom of the description as your source of truth for totals
+- Each distinct cabinet WIDTH gets its own entry (e.g. three 600mm base cabs = one entry with qty:3)
+- has_drawer: true ONLY if drawers explicitly mentioned for that cabinet type/width
+- has_door: true for all base/wall/tall/vanity unless described as open
+- Tall cabinets always have 2 doors (top half + bottom half)
+- qty = exact count from the description summary
+- If the description summary says 8 base cabinets total, your base entries must add up to exactly 8
+- width_mm: use exact mm from description, snap to nearest standard if unclear (300/400/450/500/600/750/900/1000/1200)
 
-Respond with ONLY valid JSON, no markdown, no explanation:
+Respond with ONLY valid JSON — no markdown, no extra text:
 {
-  "scope": "brief one-line summary of what was found",
+  "scope": "brief summary e.g. '12-cabinet kitchen with island'",
   "cabinets": {
-    "base":   [{"width_mm": 600, "qty": 1, "has_drawer": false, "has_door": true, "note": "describe position"}],
+    "base":   [{"width_mm": 600, "qty": 1, "has_drawer": false, "has_door": true, "note": "left of sink"}],
     "wall":   [{"width_mm": 600, "qty": 1, "has_door": true, "note": ""}],
-    "tall":   [{"width_mm": 600, "qty": 1, "note": ""}],
+    "tall":   [{"width_mm": 600, "qty": 1, "note": "pantry"}],
     "vanity": [{"width_mm": 600, "qty": 1, "has_drawer": false, "has_door": true, "note": ""}]
   },
   "benchtop_lm": 0,
@@ -3543,59 +3672,84 @@ Respond with ONLY valid JSON, no markdown, no explanation:
   "total_doors_check": 0,
   "total_drawers_check": 0,
   "notes": ""
-}
-
-After filling in cabinets, verify: count all doors and drawers from your cabinet entries and put totals in total_doors_check and total_drawers_check.`;
+}`;
 
     const extractText = await callGPT([{role:'user',content:[{type:'text',text:extractPrompt}]}], 1500);
     const m1 = extractText.match(/\{[\s\S]*\}/);
-    if(!m1) throw new Error('No JSON in extraction response');
-    const extracted = JSON.parse(m1[0]);
+    if(!m1) throw new Error('Could not extract structured data from plan description');
+    let extracted = JSON.parse(m1[0]);
 
-    // ── STAGE 3: Verify counts match ─────────────────────────
-    // Cross-check AI's own door/drawer count against what we'll calculate
+    // ── STAGE 3: Self-verification ────────────────────────────
     setS('Step 3/3 — Verifying counts…');
-
-    // Calculate what we expect from the extracted data
     const cab = extracted.cabinets||{};
-    let expectedDoors=0, expectedDrawers=0;
+    let calcDoors=0, calcDrawers=0;
     (cab.base||[]).forEach(c=>{
-      if(c.has_door!==false) expectedDoors+=(c.qty||1)*((c.width_mm||600)>=900?2:1);
-      if(c.has_drawer) expectedDrawers+=(c.qty||1);
+      if(c.has_door!==false) calcDoors+=(c.qty||1)*((c.width_mm||600)>=900?2:1);
+      if(c.has_drawer) calcDrawers+=(c.qty||1);
     });
-    (cab.wall||[]).forEach(c=>{ expectedDoors+=(c.qty||1)*((c.width_mm||600)>=900?2:1); });
-    (cab.tall||[]).forEach(c=>{ expectedDoors+=(c.qty||1)*2; });
+    (cab.wall||[]).forEach(c=>{ calcDoors+=(c.qty||1)*((c.width_mm||600)>=900?2:1); });
+    (cab.tall||[]).forEach(c=>{ calcDoors+=(c.qty||1)*2; });
     (cab.vanity||[]).forEach(c=>{
-      if(c.has_door!==false) expectedDoors+=(c.qty||1)*((c.width_mm||600)>=900?2:1);
-      if(c.has_drawer) expectedDrawers+=(c.qty||1);
+      if(c.has_door!==false) calcDoors+=(c.qty||1)*((c.width_mm||600)>=900?2:1);
+      if(c.has_drawer) calcDrawers+=(c.qty||1);
     });
 
-    // If AI's own check count differs from what we calculated, flag it
-    const aiDoors   = extracted.total_doors_check   || 0;
-    const aiDrawers = extracted.total_drawers_check || 0;
-    let verifyNote  = '';
-    if(aiDoors>0 && Math.abs(aiDoors-expectedDoors)>1){
-      verifyNote += `⚠️ Door count mismatch: AI counted ${aiDoors}, calculated ${expectedDoors}. `;
-    }
-    if(aiDrawers>0 && Math.abs(aiDrawers-expectedDrawers)>0){
-      verifyNote += `⚠️ Drawer count mismatch: AI counted ${aiDrawers}, calculated ${expectedDrawers}. `;
-    }
-    if(verifyNote) extracted.notes = (extracted.notes||'') + ' ' + verifyNote;
+    const aiDoors   = extracted.total_doors_check||0;
+    const aiDrawers = extracted.total_drawers_check||0;
+    let warnings = [];
+    if(aiDoors>0 && Math.abs(aiDoors-calcDoors)>1)
+      warnings.push(`⚠️ Door count: plan shows ${aiDoors}, extracted ${calcDoors} — please review`);
+    if(aiDrawers>0 && Math.abs(aiDrawers-calcDrawers)>0)
+      warnings.push(`⚠️ Drawer count: plan shows ${aiDrawers}, extracted ${calcDrawers} — please review`);
+    if(warnings.length) extracted.notes = warnings.join(' ');
 
-    // Clean up uploaded file
     if(fileId) fetch('https://api.openai.com/v1/files/'+fileId,{method:'DELETE',headers:{'Authorization':'Bearer '+apiKey}}).catch(()=>{});
 
-    // ── STAGE 4: Deterministic JS calculation ─────────────────
-    item.estimate = calculateEstimateFromPlan(extracted, margin, labourRate, item.displayMode||'summary', {
-      machineRate:  item.machineRate  || PRICING_DB.machineRate  || 60,
-      assemblyRate: item.assemblyRate || PRICING_DB.assemblyRate || 85
-    });
+    // Save the extraction — this is now CACHED
+    // Subsequent Calculate calls use this, not the AI
     item.extracted = extracted;
-    item.status = 'done';
-    toast('✅ '+item.name+' estimated!');
-  }catch(e){ item.status='error'; item.errorMsg=e.message; toast('❌ '+e.message.slice(0,60)); }
-  renderEstimateItems(); updateCombinedTotal();
+    item.status = 'read'; // new status: plan has been read, not yet calculated
+    toast('✅ Plan read! Review cabinets then click Calculate.');
+
+  }catch(e){
+    item.status='error'; item.errorMsg=e.message;
+    toast('❌ '+e.message.slice(0,80));
+  }
+  renderEstimateItems();
 }
+
+// ── Re-read plan (clears cache, runs AI again) ────────────
+async function reReadPlan(id){
+  const item = estimateItems.find(i=>i.id===id);
+  if(!item) return;
+  if(!confirm('Re-read will discard the current reading and run the AI again. Continue?')) return;
+  item.extracted = null; item.planDescription = null; item.estimate = null; item.status = 'empty';
+  renderEstimateItems();
+  setTimeout(()=>readPlan(id), 100);
+}
+
+// ── Calculate from cached extraction (deterministic, instant) ─
+function calculateFromExtracted(id){
+  const item = estimateItems.find(i=>i.id===id);
+  if(!item || !item.extracted) return;
+  item.overrideMargin  = parseFloat(document.getElementById('item-margin-'+id)?.value)||0;
+  item.overrideLabour  = parseFloat(document.getElementById('item-labour-'+id)?.value)||0;
+  item.machineRate     = parseFloat(document.getElementById('item-machinerate-'+id)?.value)||0;
+  item.assemblyRate    = parseFloat(document.getElementById('item-assemblyrate-'+id)?.value)||0;
+  const margin     = item.overrideMargin  || PRICING_DB.margin      || 30;
+  const labourRate = item.overrideLabour  || PRICING_DB.labourRate  || 85;
+  item.estimate = calculateEstimateFromPlan(item.extracted, margin, labourRate, item.displayMode||'summary', {
+    machineRate:  item.machineRate  || PRICING_DB.machineRate  || 60,
+    assemblyRate: item.assemblyRate || PRICING_DB.assemblyRate || 85
+  });
+  item.status = 'done';
+  renderEstimateItems();
+  updateCombinedTotal();
+  toast('✅ Estimate calculated!');
+}
+
+// ── Keep old runItemEstimate as alias (backward compat) ───────
+async function runItemEstimate(id){ await readPlan(id); }
 
 async function downloadCombinedPDF(){
   const client=document.getElementById('est-client')?.value||'Client';
@@ -3611,7 +3765,7 @@ async function downloadCombinedPDF(){
     return `<div style="margin-bottom:28px;page-break-inside:avoid"><h3 style="color:#1a237e;border-bottom:2px solid #1a237e;padding-bottom:4px;margin-bottom:8px">${item.name} — ${item.type}</h3><p style="font-size:11px;color:#555;margin:0 0 10px">${est.scope||''}</p><table style="width:100%;border-collapse:collapse;margin-bottom:6px;font-size:11px"><thead><tr style="background:#1a237e;color:#fff"><th style="padding:5px 8px;text-align:left">Item</th><th>SKU</th><th>Qty</th><th>Unit</th><th>Unit $</th><th>Total</th></tr></thead><tbody>${mR}<tr style="font-weight:700;border-top:2px solid #ddd"><td colspan="5" style="padding:5px 8px;color:#666">Materials Subtotal</td><td style="text-align:right;padding:5px 8px">$${parseFloat(est.subtotalMaterials||0).toFixed(2)}</td></tr></tbody></table><table style="width:100%;border-collapse:collapse;margin-bottom:6px;font-size:11px"><thead><tr style="background:#1a237e;color:#fff"><th style="padding:5px 8px;text-align:left">Task</th><th>Hours</th><th>Rate</th><th>Total</th></tr></thead><tbody>${lR}<tr style="font-weight:700;border-top:2px solid #ddd"><td colspan="3" style="padding:5px 8px;color:#666">Labour Subtotal</td><td style="text-align:right;padding:5px 8px">$${parseFloat(est.subtotalLabour||0).toFixed(2)}</td></tr></tbody></table><div style="background:#e8eaf6;padding:8px 12px;border-radius:4px;display:flex;justify-content:space-between;font-size:12px"><span>Area Total (incl. ${margin}% margin)</span><strong>AUD $${parseFloat(est.grandTotal||0).toLocaleString('en-AU',{minimumFractionDigits:2})}</strong></div></div>`;
   }).join('');
   const sumRows=done.map(i=>`<tr><td style="padding:6px 10px">${i.name}</td><td style="padding:6px 10px;color:#666">${i.type}</td><td style="padding:6px 10px;text-align:right;font-weight:600">AUD $${parseFloat(i.estimate.grandTotal||0).toLocaleString('en-AU',{minimumFractionDigits:2})}</td></tr>`).join('');
-  const html=`<!DOCTYPE html><html><head><meta charset="UTF-8"/><style>body{font-family:Arial,sans-serif;font-size:12px;color:#222;padding:40px;max-width:800px;margin:0 auto}h1{color:#1a237e;font-size:20px}table{width:100%;border-collapse:collapse}th{background:#1a237e;color:#fff;padding:6px 8px;text-align:left}td{border-bottom:1px solid #eee;padding:5px 8px}.grand{background:#1a237e;color:#fff;padding:14px 20px;border-radius:6px;display:flex;justify-content:space-between;margin:16px 0}.footer{text-align:center;font-size:10px;color:#999;border-top:1px solid #eee;padding-top:10px;margin-top:20px}</style></head><body><h1>VIP Cabinets — Combined Estimate</h1><p style="color:#666">${client} · ${address||'—'} · ${date}</p><h3 style="color:#1a237e">Summary</h3><table><thead><tr><th>Area</th><th>Type</th><th>Total</th></tr></thead><tbody>${sumRows}</tbody></table><div class="grand"><span>Combined Total (all areas, incl. margin)</span><strong style="font-size:18px">AUD $${grand.toLocaleString('en-AU',{minimumFractionDigits:2})}</strong></div><h3 style="color:#1a237e">Detailed Breakdown</h3>${sections}<div class="footer">Valid 30 days · All prices AUD · PAH Admin Panel</div></body></html>`;
+  const html=`<!DOCTYPE html><html><head><meta charset="UTF-8"/><style>body{font-family:Arial,sans-serif;font-size:12px;color:#222;padding:40px;max-width:800px;margin:0 auto}h1{color:#1a237e;font-size:20px}table{width:100%;border-collapse:collapse}th{background:#1a237e;color:#fff;padding:6px 8px;text-align:left}td{border-bottom:1px solid #eee;padding:5px 8px}.grand{background:#1a237e;color:#fff;padding:14px 20px;border-radius:6px;display:flex;justify-content:space-between;margin:16px 0}.footer{text-align:center;font-size:10px;color:#999;border-top:1px solid #eee;padding-top:10px;margin-top:20px}</style></head><body><h1>VIP Cabinets — Combined Estimate</h1><p style="color:#666">${client} · ${address||'—'} · ${date}</p><h3 style="color:#1a237e">Summary</h3><table><thead><tr><th>Area</th><th>Type</th><th>Total</th></tr></thead><tbody>${sumRows}</tbody></table><div class="grand"><span>Combined Total (all areas, incl. margin)</span><strong style="font-size:18px">AUD $${grand.toLocaleString('en-AU',{minimumFractionDigits:2})}</strong></div><h3 style="color:#1a237e">Detailed Breakdown</h3>${sections}<div class="footer">Valid 30 days · All prices AUD · PAH Admin Panel</div>`;
   const w=window.open('','_blank'); w.document.write(html); w.document.close(); setTimeout(()=>w.print(),500);
 }
 
@@ -3934,3 +4088,5 @@ function updateEstOverrideHints(){} // kept for compat
 
 
 </script>
+</body>
+</html>
