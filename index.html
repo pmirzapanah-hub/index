@@ -3254,7 +3254,44 @@ async function runItemEstimate(id){
   const margin=item.overrideMargin||PRICING_DB.margin||30;
   const labourRate=item.overrideLabour||PRICING_DB.labourRate||85;
   const pCtx=PRICING_DB.items.length?'PRICING DATABASE:\nSKU|Description|Unit|BulkPrice|LabourHrs|InstallCost|Margin%\n'+PRICING_DB.items.map(p=>`${p.sku}|${p.description}|${p.unit}|$${p.bulkPrice}|${p.labourHours}hrs|$${p.installCost}|${p.margin}%`).join('\n'):'Use reasonable Australian market rates.';
-  const prompt=`You are an expert cabinet maker and joinery estimator in Australia.\nAnalyse this ${item.fileType==='pdf'?'PDF':'image'} for a ${item.type} project.\nArea: ${item.name}\n${item.notes?'Notes: '+item.notes:''}\n${pCtx}\nLabour: AUD $${labourRate}/hr\nMargin: ${margin}%\nRespond ONLY with valid JSON (no markdown):\n{"scope":"brief summary","materials":[{"sku":"","description":"","qty":1,"unit":"each","unitPrice":0,"total":0}],"labour":[{"task":"","hours":0,"rate":${labourRate},"total":0}],"subtotalMaterials":0,"subtotalLabour":0,"marginRate":${margin},"marginAmount":0,"grandTotal":0}\ngrandTotal=(subtotalMaterials+subtotalLabour)*(1+${margin}/100)`;
+  const prompt=`You are a cabinet making and joinery estimator for VIP Cabinets in Australia.
+Analyse the uploaded ${item.fileType==='pdf'?'PDF document':'image'} carefully and produce a detailed, consistent estimate.
+
+AREA: ${item.name}
+PROJECT TYPE: ${item.type}
+LABOUR RATE: AUD $${labourRate}/hr (use this exact rate for all labour)
+MARGIN: ${margin}% (apply to grand total only)
+${item.notes?'CLIENT NOTES: '+item.notes:''}
+
+${pCtx}
+
+INSTRUCTIONS — follow exactly to ensure consistent results:
+1. Count every visible cabinet, door, drawer, and hardware item from the plan
+2. For each material item: match to pricing database by keyword, use the BulkPrice as unitPrice
+3. For each labour task: use the exact hours from pricing database LabourHours column
+4. Calculate: total = qty * unitPrice for each material row
+5. Calculate: total = hours * rate for each labour row
+6. subtotalMaterials = sum of all material totals
+7. subtotalLabour = sum of all labour totals
+8. grandTotal = (subtotalMaterials + subtotalLabour) * (1 + ${margin} / 100)
+9. Round all dollar values to 2 decimal places
+10. Do NOT invent items not visible in the plan
+
+Respond with ONLY this JSON structure, no markdown, no explanation:
+{
+  "scope": "one sentence describing exactly what is being estimated",
+  "materials": [
+    {"sku": "from database or empty", "description": "exact item name", "qty": 0, "unit": "each", "unitPrice": 0.00, "total": 0.00}
+  ],
+  "labour": [
+    {"task": "exact task name", "hours": 0.0, "rate": ${labourRate}, "total": 0.00}
+  ],
+  "subtotalMaterials": 0.00,
+  "subtotalLabour": 0.00,
+  "marginRate": ${margin},
+  "marginAmount": 0.00,
+  "grandTotal": 0.00
+}`;
   try{
     const apiKey=await getOpenAIKey();
     if(!apiKey) throw new Error('Could not decrypt OpenAI key.');
@@ -3267,12 +3304,12 @@ async function runItemEstimate(id){
       if(!ur.ok) throw new Error('PDF upload: '+(await ur.text()).slice(0,150));
       const ud=await ur.json();
       setS('Analysing PDF…');
-      resp=await fetch('https://api.openai.com/v1/chat/completions',{method:'POST',headers:{'Content-Type':'application/json','Authorization':'Bearer '+apiKey},body:JSON.stringify({model:'gpt-4o',max_tokens:4000,messages:[{role:'user',content:[{type:'text',text:prompt},{type:'file',file:{file_id:ud.id}}]}]})});
+      resp=await fetch('https://api.openai.com/v1/chat/completions',{method:'POST',headers:{'Content-Type':'application/json','Authorization':'Bearer '+apiKey},body:JSON.stringify({model:'gpt-4o',max_tokens:4000,temperature:0,seed:42,messages:[{role:'user',content:[{type:'text',text:prompt},{type:'file',file:{file_id:ud.id}}]}]})});
       fetch('https://api.openai.com/v1/files/'+ud.id,{method:'DELETE',headers:{'Authorization':'Bearer '+apiKey}}).catch(()=>{});
     } else {
       const mime=(['image/jpeg','image/png','image/gif','image/webp'].includes(item.mimeType||''))?item.mimeType:'image/jpeg';
       setS('Analysing image…');
-      resp=await fetch('https://api.openai.com/v1/chat/completions',{method:'POST',headers:{'Content-Type':'application/json','Authorization':'Bearer '+apiKey},body:JSON.stringify({model:'gpt-4o',max_tokens:4000,messages:[{role:'user',content:[{type:'image_url',image_url:{url:'data:'+mime+';base64,'+item.fileData,detail:'high'}},{type:'text',text:prompt}]}]})});
+      resp=await fetch('https://api.openai.com/v1/chat/completions',{method:'POST',headers:{'Content-Type':'application/json','Authorization':'Bearer '+apiKey},body:JSON.stringify({model:'gpt-4o',max_tokens:4000,temperature:0,seed:42,messages:[{role:'user',content:[{type:'image_url',image_url:{url:'data:'+mime+';base64,'+item.fileData,detail:'high'}},{type:'text',text:prompt}]}]})});
     }
     if(!resp.ok) throw new Error('OpenAI '+resp.status+': '+(await resp.text()).slice(0,200));
     const data=await resp.json();
