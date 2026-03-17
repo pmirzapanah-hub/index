@@ -1,5 +1,54 @@
 {
-  "tasks": [],
+  "tasks": [
+    {
+      "id": 1,
+      "name": "Review Q1 budget report",
+      "done": true,
+      "pri": "h",
+      "due": "2026-03-09",
+      "status": "done"
+    },
+    {
+      "id": 2,
+      "name": "Send stakeholder update",
+      "done": false,
+      "pri": "h",
+      "due": "2026-03-09",
+      "status": "pending"
+    },
+    {
+      "id": 3,
+      "name": "Update project timeline",
+      "done": false,
+      "pri": "m",
+      "due": "2026-03-10",
+      "status": "pending"
+    },
+    {
+      "id": 4,
+      "name": "Schedule team stand-up",
+      "done": true,
+      "pri": "l",
+      "due": "2026-03-09",
+      "status": "done"
+    },
+    {
+      "id": 5,
+      "name": "Prepare compliance checklist",
+      "done": false,
+      "pri": "m",
+      "due": "2026-03-11",
+      "status": "pending"
+    },
+    {
+      "id": 6,
+      "name": "Archive sprint files",
+      "done": false,
+      "pri": "l",
+      "due": "2026-03-12",
+      "status": "pending"
+    }
+  ],
   "projects": [
     {
       "id": 1,
@@ -107,5 +156,14 @@
   "reminderIntervals": [
     1
   ],
-  "savedAt": "2026-03-15T20:29:36.415Z"
+  "pricingDB": {
+    "margin": 30,
+    "labourRate": 85,
+    "machineRate": 60,
+    "assemblyRate": 85,
+    "odPath": "",
+    "csvData": "",
+    "items": []
+  },
+  "savedAt": "2026-03-17T09:35:58.595Z"
 }
