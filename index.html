@@ -3173,7 +3173,7 @@ let CALC_RULES = {
   // Doors & drawer fronts — confirmed per job
   frontBoard:   { thickness: 18, material: 'MDF', sheetW: 1200, sheetH: 2400 },
   // Kickboard/toekick — 16mm HMR
-  kickboard:    { height: 150, material: 'HMR' },
+  kickboard:    { height: 140, material: 'HMR' },  // 140mm verified from Mozaik Part.pdf
   // Saw kerf allowance
   kerfMm: 4,
   // Waste factor for nesting (percentage as decimal)
@@ -4105,87 +4105,143 @@ function packPartsToSheets(parts){
 // ── CABINET PART DECOMPOSER ────────────────────────────────
 // Break each cabinet type into its individual parts
 function getCabinetParts(type, width_mm, qty, options={}){
-  const w    = width_mm;
-  const cr   = CALC_RULES;
-  const cT   = cr.carcassBoard.thickness || 16;
-  const fT   = cr.frontBoard.thickness   || 18;
-  const hmrParts    = [];
-  const colourParts = [];
+  // ── EXACT MOZAIK FORMULAS (reverse-engineered from Part.pdf) ──
+  // Verified against: Job "3 Jade Place", 22/03/2026
+  const W   = width_mm;
+  const cr  = CALC_RULES;
+  const T   = cr.carcassBoard.thickness || 16;  // carcass HMR thickness
+  const FT  = cr.frontBoard.thickness   || 18;  // front MDF thickness
+  const KB  = cr.kickboard?.height      || 140; // kickboard/toekick height mm
+
+  const hmrParts    = [];  // 16mm HMR carcass
+  const colourParts = [];  // front MDF (doors/drawer fronts)
 
   if(type === 'base'){
-    const cabH  = options.baseH || 720;
-    const cabD  = options.baseD || 560;
-    const backW = w - (cT*2);
+    const CAB_H = options.baseH || 870;   // total cabinet height inc kickboard
+    const CAB_D = options.baseD || 560;   // cabinet depth
+    const SIDE_H = CAB_H - KB;            // side panel height = 870-140=730
+    const BACK_W = W - (T * 2) - 1;      // back width = 800-32-1=767
+    const BOT_D  = CAB_D - T - 0.5;      // bottom depth = 560-16-0.5=543.5
+    const SHELF_W = BACK_W - 3;          // shelf width = 767-3=764
+    const SHELF_D = BOT_D - 10;          // shelf depth = 543.5-10=533.5
+    const DOOR_H  = SIDE_H - 3;          // door height = 730-3=727
+    const NUM_DOORS = (options.has_door !== false) ? (W >= 900 ? 2 : (W < 500 ? 1 : 2)) : 0;
+    const DOOR_W  = NUM_DOORS > 0 ? Math.round((W - NUM_DOORS * 1) / NUM_DOORS * 10)/10 : 0;
+    const DWR_W   = W - 6;               // drawer front width = 600-6=594
+
     for(let i=0;i<qty;i++){
-      hmrParts.push({w:cabD,       h:cabH,    label:`Base ${w}mm side-L`,   edge:'1L1S'});
-      hmrParts.push({w:cabD,       h:cabH,    label:`Base ${w}mm side-R`,   edge:'1L1S'});
-      hmrParts.push({w:backW,      h:cabD,    label:`Base ${w}mm top-rail`, edge:'4sides'});
-      hmrParts.push({w:backW,      h:cabD,    label:`Base ${w}mm bottom`,   edge:'4sides'});
-      hmrParts.push({w:backW,      h:cabH,    label:`Base ${w}mm back`,     edge:'none'});
-      hmrParts.push({w:backW,      h:cabD-20, label:`Base ${w}mm shelf`,    edge:'4sides'});
-      if(options.includeKickboard !== false) hmrParts.push({w:w, h:150, label:`Base ${w}mm kickboard`, edge:'front'});
-      const doorH   = options.has_drawer ? (cabH-170-3) : (cabH-3);
-      const singleW = w<900 ? (w-3) : Math.floor((w-3)/2);
-      if(options.has_door !== false){
-        colourParts.push({w:singleW,          h:doorH, label:`Base ${w}mm door`,   edge:'4sides', board:`${fT}mm MDF`});
-        if(w>=900) colourParts.push({w:Math.ceil((w-3)/2), h:doorH, label:`Base ${w}mm door-2`, edge:'4sides', board:`${fT}mm MDF`});
+      // HMR carcass parts
+      hmrParts.push({w:CAB_D,   h:SIDE_H, label:`Base ${W}mm UEL (side-L)`,   edge:'1L1S', group:'sides'});
+      hmrParts.push({w:CAB_D,   h:SIDE_H, label:`Base ${W}mm UER (side-R)`,   edge:'1L1S', group:'sides'});
+      hmrParts.push({w:BACK_W,  h:SIDE_H, label:`Base ${W}mm UB (back)`,      edge:'none',  group:'back'});
+      hmrParts.push({w:BACK_W,  h:BOT_D,  label:`Base ${W}mm BOT (bottom)`,   edge:'4sides',group:'horiz'});
+      hmrParts.push({w:BACK_W,  h:100,    label:`Base ${W}mm FrS (top rail)`, edge:'front', group:'horiz'});
+      hmrParts.push({w:SHELF_W, h:SHELF_D,label:`Base ${W}mm AdjSh (shelf)`,  edge:'front', group:'shelf'});
+      if(options.includeKickboard !== false){
+        hmrParts.push({w:W,     h:KB,     label:`Base ${W}mm kickboard`,      edge:'front', group:'kick'});
       }
-      if(options.has_drawer) colourParts.push({w:w-3, h:166, label:`Base ${w}mm drawer-front`, edge:'4sides', board:`${fT}mm MDF`});
+
+      // Front MDF — doors
+      if(options.has_door !== false && !options.has_drawer){
+        for(let d=0;d<NUM_DOORS;d++){
+          hmrParts.push; // placeholder — actually goes to colour
+          colourParts.push({w:DOOR_W, h:DOOR_H, label:`Base ${W}mm Door ${d===0?'(L)':'(R)'}`, edge:'4sides', board:`${FT}mm MDF`, group:'doors'});
+        }
+      }
+
+      // Front MDF — drawers (like R17C2: 3 drawers)
+      if(options.has_drawer){
+        const NUM_DWR = options.drawer_count || 3;
+        // Drawer fronts: total height = SIDE_H - top_rail(100) - gaps
+        const TOTAL_DWR_H = SIDE_H - 100 - (NUM_DWR * 3); // 3mm gap each
+        for(let d=0;d<NUM_DWR;d++){
+          const DH = Math.round(TOTAL_DWR_H / NUM_DWR * 10) / 10;
+          colourParts.push({w:DWR_W, h:DH, label:`Base ${W}mm Dwr #${d+1}`, edge:'4sides', board:`${FT}mm MDF`, group:'drawers'});
+          // Drawer box parts (HMR)
+          const DBA_H = 167; // drawer box side height
+          const DBA_D = CAB_D - T - FT - 48; // depth minus back, front, hardware
+          const DBM_W = W - (T*2) - 16;      // drawer box bottom width
+          hmrParts.push({w:DBA_D, h:DBA_H, label:`Base ${W}mm Dba-L Dwr${d+1}`, edge:'none', group:'drawer_box'});
+          hmrParts.push({w:DBA_D, h:DBA_H, label:`Base ${W}mm Dba-R Dwr${d+1}`, edge:'none', group:'drawer_box'});
+          hmrParts.push({w:DBA_D, h:DBA_H, label:`Base ${W}mm Dba-B Dwr${d+1}`, edge:'none', group:'drawer_box'});
+          hmrParts.push({w:DBM_W, h:DBA_D*0.87, label:`Base ${W}mm Dbm Dwr${d+1}`, edge:'none', group:'drawer_box'});
+        }
+      }
     }
   }
+
   else if(type === 'wall'){
-    const cabH  = options.wallH || 700;
-    const cabD  = options.wallD || 300;
-    const backW = w - (cT*2);
+    const CAB_H = options.wallH || 750;   // wall cabinet height (no kickboard)
+    const CAB_D = options.wallD || 300;
+    const BACK_W = W - (T * 2) - 1;
+    const HORIZ_D = CAB_D - T - 0.5;     // top/bottom depth = 300-16-0.5=283.5
+    const SHELF_W = BACK_W - 3;
+    const SHELF_D = HORIZ_D - 10;
+    const NUM_DOORS = W >= 900 ? 2 : 2;  // wall cabs ≥500mm get 2 doors
+    const DOOR_W = Math.round((W - 8) / NUM_DOORS * 10) / 10;  // 8mm total gap (4mm each side) — verified Mozaik
+    const DOOR_H = CAB_H;                 // wall door height = full cabinet height
+
     for(let i=0;i<qty;i++){
-      hmrParts.push({w:cabD,  h:cabH,    label:`Wall ${w}mm side-L`,  edge:'1L1S'});
-      hmrParts.push({w:cabD,  h:cabH,    label:`Wall ${w}mm side-R`,  edge:'1L1S'});
-      hmrParts.push({w:backW, h:cabD,    label:`Wall ${w}mm top`,     edge:'4sides'});
-      hmrParts.push({w:backW, h:cabD,    label:`Wall ${w}mm bottom`,  edge:'4sides'});
-      hmrParts.push({w:backW, h:cabH,    label:`Wall ${w}mm back`,    edge:'none'});
-      hmrParts.push({w:backW, h:cabD-20, label:`Wall ${w}mm shelf`,   edge:'4sides'});
-      const doorH   = cabH-3;
-      const singleW = w<900 ? (w-3) : Math.floor((w-3)/2);
-      colourParts.push({w:singleW, h:doorH, label:`Wall ${w}mm door`, edge:'4sides', board:`${fT}mm MDF`});
-      if(w>=900) colourParts.push({w:Math.ceil((w-3)/2), h:doorH, label:`Wall ${w}mm door-2`, edge:'4sides', board:`${fT}mm MDF`});
-    }
-  }
-  else if(type === 'tall'){
-    const cabH  = options.ceiling_mm || 2400;
-    const cabD  = options.baseD || 560;
-    const backW = w - (cT*2);
-    for(let i=0;i<qty;i++){
-      hmrParts.push({w:cabD,  h:cabH,    label:`Tall ${w}mm side-L`,  edge:'1L1S'});
-      hmrParts.push({w:cabD,  h:cabH,    label:`Tall ${w}mm side-R`,  edge:'1L1S'});
-      hmrParts.push({w:backW, h:cabD,    label:`Tall ${w}mm top`,     edge:'4sides'});
-      hmrParts.push({w:backW, h:cabD,    label:`Tall ${w}mm bottom`,  edge:'4sides'});
-      hmrParts.push({w:backW, h:cabH,    label:`Tall ${w}mm back`,    edge:'none'});
-      hmrParts.push({w:backW, h:cabD-20, label:`Tall ${w}mm shelf-1`, edge:'4sides'});
-      hmrParts.push({w:backW, h:cabD-20, label:`Tall ${w}mm shelf-2`, edge:'4sides'});
-      const halfH = Math.floor(cabH/2)-3;
-      colourParts.push({w:w-3, h:halfH, label:`Tall ${w}mm door-top`,    edge:'4sides', board:`${fT}mm MDF`});
-      colourParts.push({w:w-3, h:halfH, label:`Tall ${w}mm door-bottom`, edge:'4sides', board:`${fT}mm MDF`});
-    }
-  }
-  else if(type === 'vanity'){
-    const cabH  = options.baseH || 720;
-    const cabD  = options.baseD ? options.baseD-110 : 450;
-    const backW = w - (cT*2);
-    for(let i=0;i<qty;i++){
-      hmrParts.push({w:cabD,  h:cabH,    label:`Vanity ${w}mm side-L`,  edge:'1L1S'});
-      hmrParts.push({w:cabD,  h:cabH,    label:`Vanity ${w}mm side-R`,  edge:'1L1S'});
-      hmrParts.push({w:backW, h:cabD,    label:`Vanity ${w}mm top`,     edge:'4sides'});
-      hmrParts.push({w:backW, h:cabD,    label:`Vanity ${w}mm bottom`,  edge:'4sides'});
-      hmrParts.push({w:backW, h:cabH,    label:`Vanity ${w}mm back`,    edge:'none'});
-      const doorH   = options.has_drawer ? (cabH-170-3) : (cabH-3);
-      const singleW = w<900 ? (w-3) : Math.floor((w-3)/2);
-      if(options.has_door !== false){
-        colourParts.push({w:singleW, h:doorH, label:`Vanity ${w}mm door`, edge:'4sides', board:`${fT}mm MDF`});
-        if(w>=900) colourParts.push({w:Math.ceil((w-3)/2), h:doorH, label:`Vanity ${w}mm door-2`, edge:'4sides', board:`${fT}mm MDF`});
+      hmrParts.push({w:CAB_D,   h:CAB_H,   label:`Wall ${W}mm UEL (side-L)`,  edge:'1L1S', group:'sides'});
+      hmrParts.push({w:CAB_D,   h:CAB_H,   label:`Wall ${W}mm UER (side-R)`,  edge:'1L1S', group:'sides'});
+      hmrParts.push({w:BACK_W,  h:CAB_H,   label:`Wall ${W}mm UB (back)`,     edge:'none',  group:'back'});
+      hmrParts.push({w:BACK_W,  h:HORIZ_D, label:`Wall ${W}mm BOT (bottom)`,  edge:'4sides',group:'horiz'});
+      hmrParts.push({w:BACK_W,  h:HORIZ_D, label:`Wall ${W}mm TOP (top)`,     edge:'4sides',group:'horiz'});
+      hmrParts.push({w:SHELF_W, h:SHELF_D, label:`Wall ${W}mm AdjSh (shelf)`, edge:'front', group:'shelf'});
+      for(let d=0;d<NUM_DOORS;d++){
+        colourParts.push({w:DOOR_W, h:DOOR_H, label:`Wall ${W}mm Door ${d===0?'(L)':'(R)'}`, edge:'4sides', board:`${FT}mm MDF`, group:'doors'});
       }
-      if(options.has_drawer) colourParts.push({w:w-3, h:166, label:`Vanity ${w}mm drawer-front`, edge:'4sides', board:`${fT}mm MDF`});
     }
   }
+
+  else if(type === 'tall'){
+    const CAB_H = options.ceiling_mm || 2400;
+    const CAB_D = options.baseD || 560;
+    const BACK_W = W - (T * 2) - 1;
+    const BOT_D  = CAB_D - T - 0.5;
+    const SHELF_D = BOT_D - 10;
+    const DOOR_H = Math.floor(CAB_H / 2) - 3;
+
+    for(let i=0;i<qty;i++){
+      hmrParts.push({w:CAB_D,   h:CAB_H,    label:`Tall ${W}mm UEL (side-L)`,  edge:'1L1S', group:'sides'});
+      hmrParts.push({w:CAB_D,   h:CAB_H,    label:`Tall ${W}mm UER (side-R)`,  edge:'1L1S', group:'sides'});
+      hmrParts.push({w:BACK_W,  h:CAB_H,    label:`Tall ${W}mm UB (back)`,     edge:'none',  group:'back'});
+      hmrParts.push({w:BACK_W,  h:BOT_D,    label:`Tall ${W}mm BOT (bottom)`,  edge:'4sides',group:'horiz'});
+      hmrParts.push({w:BACK_W,  h:BOT_D,    label:`Tall ${W}mm TOP (top)`,     edge:'4sides',group:'horiz'});
+      hmrParts.push({w:BACK_W-3,h:SHELF_D,  label:`Tall ${W}mm AdjSh-1`,       edge:'front', group:'shelf'});
+      hmrParts.push({w:BACK_W-3,h:SHELF_D,  label:`Tall ${W}mm AdjSh-2`,       edge:'front', group:'shelf'});
+      colourParts.push({w:W-3, h:DOOR_H, label:`Tall ${W}mm Door (top)`,    edge:'4sides', board:`${FT}mm MDF`, group:'doors'});
+      colourParts.push({w:W-3, h:DOOR_H, label:`Tall ${W}mm Door (bottom)`, edge:'4sides', board:`${FT}mm MDF`, group:'doors'});
+    }
+  }
+
+  else if(type === 'vanity'){
+    const CAB_H = options.baseH || 720;
+    const CAB_D = options.baseD || 450;
+    const BACK_W = W - (T * 2) - 1;
+    const BOT_D  = CAB_D - T - 0.5;
+    const SHELF_D = BOT_D - 10;
+    const DOOR_H = options.has_drawer ? (CAB_H - KB - 170 - 3) : (CAB_H - KB - 3);
+    const NUM_DOORS = W >= 900 ? 2 : 2;
+    const DOOR_W = Math.round((W - 8) / NUM_DOORS * 10) / 10;  // 8mm total gap (4mm each side) — verified Mozaik
+    const DWR_W = W - 6;
+
+    for(let i=0;i<qty;i++){
+      hmrParts.push({w:CAB_D,   h:CAB_H-KB, label:`Vanity ${W}mm side-L`,   edge:'1L1S', group:'sides'});
+      hmrParts.push({w:CAB_D,   h:CAB_H-KB, label:`Vanity ${W}mm side-R`,   edge:'1L1S', group:'sides'});
+      hmrParts.push({w:BACK_W,  h:CAB_H-KB, label:`Vanity ${W}mm back`,     edge:'none',  group:'back'});
+      hmrParts.push({w:BACK_W,  h:BOT_D,    label:`Vanity ${W}mm bottom`,   edge:'4sides',group:'horiz'});
+      if(options.has_door !== false){
+        for(let d=0;d<NUM_DOORS;d++){
+          colourParts.push({w:DOOR_W, h:DOOR_H, label:`Vanity ${W}mm Door ${d===0?'(L)':'(R)'}`, edge:'4sides', board:`${FT}mm MDF`, group:'doors'});
+        }
+      }
+      if(options.has_drawer){
+        colourParts.push({w:DWR_W, h:170, label:`Vanity ${W}mm drawer front`, edge:'4sides', board:`${FT}mm MDF`, group:'drawers'});
+      }
+    }
+  }
+
   return {hmrParts, colourParts};
 }
 
@@ -4390,7 +4446,7 @@ function calcRulesToCSV(){
     `KICKBOARD,height_mm,${cr.kickboard.height},mm,Standard toekick height`,
     `KICKBOARD,include_default,yes,,yes/no`,
     // BASE_CABINET
-    `BASE_CABINET,height_mm,${typeof BASE_H!=='undefined'?BASE_H:720},mm,Internal height`,
+    `BASE_CABINET,height_mm,870,mm,Total height including kickboard (870mm standard)`,
     `BASE_CABINET,depth_mm,${typeof BASE_D!=='undefined'?BASE_D:560},mm,Internal depth`,
     `BASE_CABINET,door_gap_mm,3,mm,Gap around door`,
     `BASE_CABINET,drawer_front_height_mm,166,mm,Standard drawer front height`,
