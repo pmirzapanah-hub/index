@@ -3537,30 +3537,53 @@ function updateExtracted(itemId, rowIdx, field, value){
   const item = estimateItems.find(i=>i.id===itemId);
   if(!item||!item.extracted) return;
   const cab = item.extracted.cabinets;
-  const allTypes = ['base','wall','tall','vanity'];
   let globalIdx = 0;
-  for(const type of allTypes){
+  for(const type of ['base','wall','tall','vanity']){
     const arr = cab[type]||[];
     for(let i=0;i<arr.length;i++){
       if(globalIdx===rowIdx){
         if(field==='type'){
-          // Move row to different type array
-          const entry = {...arr[i], type:value};
+          const entry = {...arr[i]};
           arr.splice(i,1);
           if(!cab[value]) cab[value]=[];
           cab[value].push(entry);
+          // Type change needs re-render to update disabled states
+          item.estimate=null; item.status='read';
+          renderEstimateItems();
         } else {
           arr[i][field] = value;
+          item.estimate=null; item.status='read';
+          // Update the totals line without full re-render
+          updateReviewTotals(itemId);
         }
-        // Clear estimate so user knows they need to recalculate
-        item.estimate = null;
-        item.status = 'read';
-        renderEstimateItems();
         return;
       }
       globalIdx++;
     }
   }
+}
+
+function updateReviewTotals(itemId){
+  const item = estimateItems.find(i=>i.id===itemId);
+  if(!item||!item.extracted) return;
+  const cab = item.extracted.cabinets||{};
+  const allEntries = [
+    ...(cab.base||[]).map(e=>({...e,type:'base'})),
+    ...(cab.wall||[]).map(e=>({...e,type:'wall'})),
+    ...(cab.tall||[]).map(e=>({...e,type:'tall'})),
+    ...(cab.vanity||[]).map(e=>({...e,type:'vanity'})),
+  ];
+  let totalCabs=0, totalDoors=0, totalDrawers=0;
+  allEntries.forEach(e=>{
+    const qty=e.qty||1, w=e.width_mm||600;
+    totalCabs+=qty;
+    if(e.type==='tall') totalDoors+=qty*2;
+    else if(e.has_door!==false) totalDoors+=qty*(w>=900?2:1);
+    if(e.has_drawer) totalDrawers+=qty;
+  });
+  // Update the subtitle only — no full re-render
+  const subEl = document.querySelector(`#est-item-${itemId} .est-item-subtitle`);
+  if(subEl) subEl.textContent = (item.type||'') + ' — ' + totalCabs + ' cabs · ' + totalDoors + ' doors · ' + totalDrawers + ' drawers';
 }
 
 function removeExtractedRow(itemId, rowIdx){
@@ -4090,8 +4113,8 @@ function getCabinetParts(type, width_mm, qty, options={}){
   const colourParts = [];
 
   if(type === 'base'){
-    const cabH  = options.baseH || BASE_H || 720;
-    const cabD  = options.baseD || BASE_D || 560;
+    const cabH  = options.baseH || 720;
+    const cabD  = options.baseD || 560;
     const backW = w - (cT*2);
     for(let i=0;i<qty;i++){
       hmrParts.push({w:cabD,       h:cabH,    label:`Base ${w}mm side-L`,   edge:'1L1S'});
@@ -4111,8 +4134,8 @@ function getCabinetParts(type, width_mm, qty, options={}){
     }
   }
   else if(type === 'wall'){
-    const cabH  = options.wallH || WALL_H || 700;
-    const cabD  = options.wallD || WALL_D || 300;
+    const cabH  = options.wallH || 700;
+    const cabD  = options.wallD || 300;
     const backW = w - (cT*2);
     for(let i=0;i<qty;i++){
       hmrParts.push({w:cabD,  h:cabH,    label:`Wall ${w}mm side-L`,  edge:'1L1S'});
@@ -4128,8 +4151,8 @@ function getCabinetParts(type, width_mm, qty, options={}){
     }
   }
   else if(type === 'tall'){
-    const cabH  = options.ceiling_mm || ceilH || 2400;
-    const cabD  = options.baseD || BASE_D || 560;
+    const cabH  = options.ceiling_mm || 2400;
+    const cabD  = options.baseD || 560;
     const backW = w - (cT*2);
     for(let i=0;i<qty;i++){
       hmrParts.push({w:cabD,  h:cabH,    label:`Tall ${w}mm side-L`,  edge:'1L1S'});
@@ -4145,7 +4168,7 @@ function getCabinetParts(type, width_mm, qty, options={}){
     }
   }
   else if(type === 'vanity'){
-    const cabH  = options.baseH || BASE_H || 720;
+    const cabH  = options.baseH || 720;
     const cabD  = options.baseD ? options.baseD-110 : 450;
     const backW = w - (cT*2);
     for(let i=0;i<qty;i++){
@@ -4213,7 +4236,9 @@ function calculateEstimateFromPlan(plan, margin, labourRate, displayMode, rates=
   tallCabs.forEach(cab=>{
     const qty = cab.qty||1; totalTall+=qty;
     totalDoors += qty*2;
-    const {hmrParts,colourParts} = getCabinetParts('tall', cab.width_mm||600, qty, {ceiling_mm:ceilH});
+    const {hmrParts,colourParts} = getCabinetParts('tall', cab.width_mm||600, qty, {
+      ceiling_mm:ceilH, baseD:BASE_D
+    });
     allHMRParts.push(...hmrParts);
     allColourParts.push(...colourParts);
     cabLog.push(`${qty}× Tall ${cab.width_mm||600}mm`);
@@ -4223,7 +4248,10 @@ function calculateEstimateFromPlan(plan, margin, labourRate, displayMode, rates=
     const qty = cab.qty||1; totalVanity+=qty;
     if(cab.has_drawer) totalDrawers+=qty;
     if(cab.has_door!==false) totalDoors += qty*(cab.width_mm>=900?2:1);
-    const {hmrParts,colourParts} = getCabinetParts('vanity', cab.width_mm||600, qty, {has_door:cab.has_door, has_drawer:cab.has_drawer});
+    const {hmrParts,colourParts} = getCabinetParts('vanity', cab.width_mm||600, qty, {
+      has_door:cab.has_door, has_drawer:cab.has_drawer,
+      baseH:BASE_H, baseD:BASE_D
+    });
     allHMRParts.push(...hmrParts);
     allColourParts.push(...colourParts);
     cabLog.push(`${qty}× Vanity ${cab.width_mm||600}mm`);
