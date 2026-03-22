@@ -850,6 +850,25 @@ body::before{content:'';position:fixed;inset:0;background:repeating-linear-gradi
               <input class="modal-input" id="est-handle-style" placeholder="e.g. Bar Handle 160mm Black"/></div>
             <div><label style="font-size:0.78rem;color:var(--text-dim);display:block;margin-bottom:4px">Benchtop Material</label>
               <input class="modal-input" id="est-benchtop" placeholder="e.g. Laminate, Stone, Timber"/></div>
+            <div>
+              <label style="font-size:0.78rem;color:var(--text-dim);display:block;margin-bottom:4px">
+                Door & Drawer Front Material *
+                <span style="color:var(--blue);font-size:0.7rem"> — confirm per job</span>
+              </label>
+              <select class="modal-input" id="est-front-material" onchange="updateFrontMaterial(this.value)">
+                <option value="18mdf">18mm MDF (standard)</option>
+                <option value="16mdf">16mm MDF</option>
+                <option value="18hmr">18mm HMR</option>
+                <option value="16hmr">16mm HMR</option>
+              </select>
+            </div>
+            <div>
+              <label style="font-size:0.78rem;color:var(--text-dim);display:block;margin-bottom:4px">Kickboard / Toekick</label>
+              <select class="modal-input" id="est-kickboard">
+                <option value="yes">Include kickboard (16mm HMR)</option>
+                <option value="no">No kickboard</option>
+              </select>
+            </div>
           </div>
           <div style="margin-top:10px"><label style="font-size:0.78rem;color:var(--text-dim);display:block;margin-bottom:4px">Special Requirements</label>
             <textarea class="modal-input" id="est-special-req" rows="2" placeholder="e.g. Soft-close all hinges and drawers, pull-out bin, corner unit, integrated fridge panels…"></textarea>
@@ -1028,6 +1047,44 @@ body::before{content:'';position:fixed;inset:0;background:repeating-linear-gradi
               <textarea class="modal-input" id="pd-specialNotes" rows="2" placeholder="e.g. All hinges soft-close. Use moisture resistant HMR for bathroom."></textarea>
             </div>
             <div id="pd-status" style="margin-top:8px;font-size:0.78rem;display:none"></div>
+          </div>
+        </div>
+
+        <div class="page-section" id="settings-calc-rules">
+          <div class="page-section-head">
+            <h3>📐 Calculation Rules</h3>
+            <div style="display:flex;gap:8px;flex-wrap:wrap">
+              <button class="btn btn-ghost btn-sm" onclick="downloadCalcRulesCSV()">⬇️ Export CSV</button>
+              <button class="btn btn-primary btn-sm" onclick="document.getElementById('calc-rules-file').click()">⬆️ Load CSV</button>
+            </div>
+          </div>
+          <div class="settings-group">
+            <p style="font-size:0.78rem;color:var(--text-dim);margin-bottom:12px;line-height:1.6">
+              All calculations are based on these rules. Export to Excel/CSV, edit your values, then reload.
+              <strong style="color:var(--text)"> Only edit the VALUE column</strong> — do not change SECTION or RULE names.
+            </p>
+            <input type="file" id="calc-rules-file" accept=".csv" style="display:none" onchange="loadCalcRulesCSV(this.files[0])"/>
+            <div id="calc-rules-status" style="display:none;margin-bottom:10px;font-size:0.78rem;padding:8px 12px;border-radius:6px"></div>
+
+            <!-- Live preview of key rules -->
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:12px" id="calc-rules-preview">
+              <div style="background:var(--surface2);border-radius:8px;padding:10px 12px;border:1px solid var(--border2)">
+                <div style="font-size:0.7rem;font-weight:700;color:var(--blue);text-transform:uppercase;margin-bottom:8px">Carcass</div>
+                <div id="cr-carcass" style="font-size:0.78rem;line-height:1.8;color:var(--text-dim)">Loading…</div>
+              </div>
+              <div style="background:var(--surface2);border-radius:8px;padding:10px 12px;border:1px solid var(--border2)">
+                <div style="font-size:0.7rem;font-weight:700;color:var(--blue);text-transform:uppercase;margin-bottom:8px">Front Boards (Doors & Drawers)</div>
+                <div id="cr-front" style="font-size:0.78rem;line-height:1.8;color:var(--text-dim)">Loading…</div>
+              </div>
+              <div style="background:var(--surface2);border-radius:8px;padding:10px 12px;border:1px solid var(--border2)">
+                <div style="font-size:0.7rem;font-weight:700;color:var(--blue);text-transform:uppercase;margin-bottom:8px">Cabinet Dimensions</div>
+                <div id="cr-dims" style="font-size:0.78rem;line-height:1.8;color:var(--text-dim)">Loading…</div>
+              </div>
+              <div style="background:var(--surface2);border-radius:8px;padding:10px 12px;border:1px solid var(--border2)">
+                <div style="font-size:0.7rem;font-weight:700;color:var(--blue);text-transform:uppercase;margin-bottom:8px">Labour Rates</div>
+                <div id="cr-labour" style="font-size:0.78rem;line-height:1.8;color:var(--text-dim)">Loading…</div>
+              </div>
+            </div>
           </div>
         </div>
 
@@ -2265,6 +2322,7 @@ window.addEventListener('DOMContentLoaded',async()=>{
   loadData();          // load local data first
   loadNotifSettings(); 
   loadPricingSettings();
+  loadCalcRulesFromStorage();
   migrateTasks();      
   await initDefaultUsers(); 
 
@@ -2507,7 +2565,7 @@ function goTo(page){
   if(page==='onedrive') syncFullOdView();
   if(page==='reports') renderReports();
   if(page==='estimator'){ /* nothing to render */ }
-  if(page==='settings'){ renderTaskStatusList(); renderUsersList(); populateNotifSettings(); populateProfileSettings(); populatePricingSettings(); renderReminderSchedule(); updateGhTokenUI(); loadProjectDefaultsForm(); loadUsersFromGitHub().then(()=>{ renderUsersList(); populateProfileSettings(); populateNotifSettings(); renderReminderSchedule(); }); }
+  if(page==='settings'){ renderTaskStatusList(); renderUsersList(); populateNotifSettings(); populateProfileSettings(); populatePricingSettings(); renderReminderSchedule(); updateGhTokenUI(); loadProjectDefaultsForm(); renderCalcRulesPreview(); loadUsersFromGitHub().then(()=>{ renderUsersList(); populateProfileSettings(); populateNotifSettings(); renderReminderSchedule(); }); }
   closeSidebar();
 }
 
@@ -3105,6 +3163,39 @@ let PRICING_DB = {
   odPath: '',
   csvData: '',
   items: []
+};
+
+// ── Calculation Skill Set ─────────────────────────────────
+// These rules govern every calculation — AI and JS both follow these
+let CALC_RULES = {
+  // Carcass — always 16mm HMR
+  carcassBoard: { thickness: 16, material: 'HMR', sheetW: 1200, sheetH: 2400 },
+  // Doors & drawer fronts — confirmed per job
+  frontBoard:   { thickness: 18, material: 'MDF', sheetW: 1200, sheetH: 2400 },
+  // Kickboard/toekick — 16mm HMR
+  kickboard:    { height: 150, material: 'HMR' },
+  // Saw kerf allowance
+  kerfMm: 4,
+  // Waste factor for nesting (percentage as decimal)
+  wasteFactor: 0.0, // 0 = bin-packing handles waste, no extra
+  // Edge tape roll length
+  edgeTapeRollM: 50,
+  // Cabinet part rules
+  parts: {
+    sides:    { count: 2, board: 'carcass', edgeSides: 2 },  // 1 long + 1 short each side
+    top:      { count: 1, board: 'carcass', edgeSides: 4 },  // all 4 sides
+    bottom:   { count: 1, board: 'carcass', edgeSides: 4 },
+    shelf:    { count: 1, board: 'carcass', edgeSides: 4 },  // all 4 sides
+    back:     { count: 1, board: 'carcass', edgeSides: 0 },  // backs not edged
+    kickboard:{ count: 1, board: 'carcass', edgeSides: 1 },  // front edge only
+    door:     { count: 1, board: 'front',   edgeSides: 4 },  // all 4 sides colour tape
+    drawerFront:{ count: 1, board: 'front', edgeSides: 4 },  // all 4 sides colour tape
+  },
+  // Labour rates (overridden per estimate if set)
+  machineMinPerBoard: 10,    // minutes per board on CNC/panel saw
+  assemblyMinPerCab:  20,    // minutes per base/wall/vanity cabinet
+  assemblyMinTall:    45,    // minutes per tall cabinet
+  assemblyMinDrawer:  10,    // extra minutes per drawer
 };
 
 // Project type defaults — saved to data.json
@@ -3945,6 +4036,9 @@ const SHEET_W = 1200;  // mm
 const SHEET_H = 2400;  // mm
 const SAW_KERF = 4;    // mm kerf per cut
 
+// Get sheet label based on board type
+function getBoardLabel(type){ return type==='front' ? `${CALC_RULES.frontBoard.thickness}mm ${CALC_RULES.frontBoard.material}` : `${CALC_RULES.carcassBoard.thickness}mm HMR`; }
+
 function packPartsToSheets(parts){
   // Sort parts largest first for better packing
   const sorted = [...parts].sort((a,b) => (b.w*b.h) - (a.w*a.h));
@@ -3988,95 +4082,87 @@ function packPartsToSheets(parts){
 // ── CABINET PART DECOMPOSER ────────────────────────────────
 // Break each cabinet type into its individual parts
 function getCabinetParts(type, width_mm, qty, options={}){
-  const w = width_mm;
-  const hmrParts = [];   // 16mm HMR (sides, tops, bottoms, shelves, backs)
-  const colourParts = []; // 18mm Colour board (doors, drawer fronts, visible ends)
-  
+  const w    = width_mm;
+  const cr   = CALC_RULES;
+  const cT   = cr.carcassBoard.thickness || 16;
+  const fT   = cr.frontBoard.thickness   || 18;
+  const hmrParts    = [];
+  const colourParts = [];
+
   if(type === 'base'){
-    const h = (options.baseH||BASE_H) - 0;    // internal height
-    const d = options.baseD||BASE_D;    // internal depth
-    const backH = h;
-    const backW = w - 36; // inset back
-    
+    const cabH  = options.baseH || BASE_H || 720;
+    const cabD  = options.baseD || BASE_D || 560;
+    const backW = w - (cT*2);
     for(let i=0;i<qty;i++){
-      // HMR parts (carcass)
-      hmrParts.push({w:d, h:h,       label:`Base ${w}mm side`});   // left side
-      hmrParts.push({w:d, h:h,       label:`Base ${w}mm side`});   // right side
-      hmrParts.push({w:w-36, h:d,    label:`Base ${w}mm top rail`}); // top rail
-      hmrParts.push({w:w-36, h:d,    label:`Base ${w}mm bottom`}); // bottom
-      hmrParts.push({w:backW, h:backH, label:`Base ${w}mm back`}); // back (16mm HMR)
-      if(options.shelf !== false) hmrParts.push({w:w-38, h:d-20, label:`Base ${w}mm shelf`});
-      
-      // Colour board (doors/drawer fronts)
-      const doorH = options.has_drawer ? 680 - 170 : 680;
-      if(options.has_door !== false) colourParts.push({w:w<900?w-3:Math.floor((w-3)/2), h:doorH, label:`Base ${w}mm door`});
-      if(w>=900 && options.has_door!==false) colourParts.push({w:Math.ceil((w-3)/2), h:doorH, label:`Base ${w}mm door 2`});
-      if(options.has_drawer) colourParts.push({w:w-3, h:166, label:`Base ${w}mm drawer front`});
+      hmrParts.push({w:cabD,       h:cabH,    label:`Base ${w}mm side-L`,   edge:'1L1S'});
+      hmrParts.push({w:cabD,       h:cabH,    label:`Base ${w}mm side-R`,   edge:'1L1S'});
+      hmrParts.push({w:backW,      h:cabD,    label:`Base ${w}mm top-rail`, edge:'4sides'});
+      hmrParts.push({w:backW,      h:cabD,    label:`Base ${w}mm bottom`,   edge:'4sides'});
+      hmrParts.push({w:backW,      h:cabH,    label:`Base ${w}mm back`,     edge:'none'});
+      hmrParts.push({w:backW,      h:cabD-20, label:`Base ${w}mm shelf`,    edge:'4sides'});
+      if(options.includeKickboard !== false) hmrParts.push({w:w, h:150, label:`Base ${w}mm kickboard`, edge:'front'});
+      const doorH   = options.has_drawer ? (cabH-170-3) : (cabH-3);
+      const singleW = w<900 ? (w-3) : Math.floor((w-3)/2);
+      if(options.has_door !== false){
+        colourParts.push({w:singleW,          h:doorH, label:`Base ${w}mm door`,   edge:'4sides', board:`${fT}mm MDF`});
+        if(w>=900) colourParts.push({w:Math.ceil((w-3)/2), h:doorH, label:`Base ${w}mm door-2`, edge:'4sides', board:`${fT}mm MDF`});
+      }
+      if(options.has_drawer) colourParts.push({w:w-3, h:166, label:`Base ${w}mm drawer-front`, edge:'4sides', board:`${fT}mm MDF`});
     }
   }
-  
   else if(type === 'wall'){
-    const h = options.wallH||WALL_H;   // overhead height
-    const d = options.wallD||WALL_D;   // depth
-    const backH = h;
-    const backW = w - 36;
-    
+    const cabH  = options.wallH || WALL_H || 700;
+    const cabD  = options.wallD || WALL_D || 300;
+    const backW = w - (cT*2);
     for(let i=0;i<qty;i++){
-      hmrParts.push({w:d, h:h,       label:`Wall ${w}mm side`});
-      hmrParts.push({w:d, h:h,       label:`Wall ${w}mm side`});
-      hmrParts.push({w:w-36, h:d,    label:`Wall ${w}mm top`});
-      hmrParts.push({w:w-36, h:d,    label:`Wall ${w}mm bottom`});
-      hmrParts.push({w:backW, h:backH,label:`Wall ${w}mm back`});
-      hmrParts.push({w:w-38, h:d-20, label:`Wall ${w}mm shelf`});
-      
-      const doorH = h - 3;
-      colourParts.push({w:w<900?w-3:Math.floor((w-3)/2), h:doorH, label:`Wall ${w}mm door`});
-      if(w>=900) colourParts.push({w:Math.ceil((w-3)/2), h:doorH, label:`Wall ${w}mm door 2`});
+      hmrParts.push({w:cabD,  h:cabH,    label:`Wall ${w}mm side-L`,  edge:'1L1S'});
+      hmrParts.push({w:cabD,  h:cabH,    label:`Wall ${w}mm side-R`,  edge:'1L1S'});
+      hmrParts.push({w:backW, h:cabD,    label:`Wall ${w}mm top`,     edge:'4sides'});
+      hmrParts.push({w:backW, h:cabD,    label:`Wall ${w}mm bottom`,  edge:'4sides'});
+      hmrParts.push({w:backW, h:cabH,    label:`Wall ${w}mm back`,    edge:'none'});
+      hmrParts.push({w:backW, h:cabD-20, label:`Wall ${w}mm shelf`,   edge:'4sides'});
+      const doorH   = cabH-3;
+      const singleW = w<900 ? (w-3) : Math.floor((w-3)/2);
+      colourParts.push({w:singleW, h:doorH, label:`Wall ${w}mm door`, edge:'4sides', board:`${fT}mm MDF`});
+      if(w>=900) colourParts.push({w:Math.ceil((w-3)/2), h:doorH, label:`Wall ${w}mm door-2`, edge:'4sides', board:`${fT}mm MDF`});
     }
   }
-  
   else if(type === 'tall'){
-    const h = options.ceiling_mm || 2400;
-    const d = 560;
-    const backH = h;
-    const backW = w - 36;
-    
+    const cabH  = options.ceiling_mm || ceilH || 2400;
+    const cabD  = options.baseD || BASE_D || 560;
+    const backW = w - (cT*2);
     for(let i=0;i<qty;i++){
-      hmrParts.push({w:d, h:h,       label:`Tall ${w}mm side`});
-      hmrParts.push({w:d, h:h,       label:`Tall ${w}mm side`});
-      hmrParts.push({w:w-36, h:d,    label:`Tall ${w}mm top`});
-      hmrParts.push({w:w-36, h:d,    label:`Tall ${w}mm bottom`});
-      hmrParts.push({w:backW, h:backH,label:`Tall ${w}mm back`});
-      hmrParts.push({w:w-38, h:d-20, label:`Tall ${w}mm shelf mid`});
-      hmrParts.push({w:w-38, h:d-20, label:`Tall ${w}mm shelf`});
-      
-      // Two doors (top and bottom)
-      const doorH = Math.floor(h/2) - 3;
-      colourParts.push({w:w-3, h:doorH, label:`Tall ${w}mm door top`});
-      colourParts.push({w:w-3, h:doorH, label:`Tall ${w}mm door bottom`});
+      hmrParts.push({w:cabD,  h:cabH,    label:`Tall ${w}mm side-L`,  edge:'1L1S'});
+      hmrParts.push({w:cabD,  h:cabH,    label:`Tall ${w}mm side-R`,  edge:'1L1S'});
+      hmrParts.push({w:backW, h:cabD,    label:`Tall ${w}mm top`,     edge:'4sides'});
+      hmrParts.push({w:backW, h:cabD,    label:`Tall ${w}mm bottom`,  edge:'4sides'});
+      hmrParts.push({w:backW, h:cabH,    label:`Tall ${w}mm back`,    edge:'none'});
+      hmrParts.push({w:backW, h:cabD-20, label:`Tall ${w}mm shelf-1`, edge:'4sides'});
+      hmrParts.push({w:backW, h:cabD-20, label:`Tall ${w}mm shelf-2`, edge:'4sides'});
+      const halfH = Math.floor(cabH/2)-3;
+      colourParts.push({w:w-3, h:halfH, label:`Tall ${w}mm door-top`,    edge:'4sides', board:`${fT}mm MDF`});
+      colourParts.push({w:w-3, h:halfH, label:`Tall ${w}mm door-bottom`, edge:'4sides', board:`${fT}mm MDF`});
     }
   }
-  
   else if(type === 'vanity'){
-    const h = 720;
-    const d = 450;
-    const backH = h;
-    const backW = w - 36;
-    
+    const cabH  = options.baseH || BASE_H || 720;
+    const cabD  = options.baseD ? options.baseD-110 : 450;
+    const backW = w - (cT*2);
     for(let i=0;i<qty;i++){
-      hmrParts.push({w:d, h:h,       label:`Vanity ${w}mm side`});
-      hmrParts.push({w:d, h:h,       label:`Vanity ${w}mm side`});
-      hmrParts.push({w:w-36, h:d,    label:`Vanity ${w}mm top`});
-      hmrParts.push({w:w-36, h:d,    label:`Vanity ${w}mm bottom`});
-      hmrParts.push({w:backW, h:backH,label:`Vanity ${w}mm back`});
-      
-      const doorH = options.has_drawer ? h - 170 - 3 : h - 3;
-      if(options.has_door !== false) colourParts.push({w:w<900?w-3:Math.floor((w-3)/2), h:doorH, label:`Vanity ${w}mm door`});
-      if(w>=900 && options.has_door!==false) colourParts.push({w:Math.ceil((w-3)/2), h:doorH, label:`Vanity ${w}mm door 2`});
-      if(options.has_drawer) colourParts.push({w:w-3, h:166, label:`Vanity ${w}mm drawer front`});
+      hmrParts.push({w:cabD,  h:cabH,    label:`Vanity ${w}mm side-L`,  edge:'1L1S'});
+      hmrParts.push({w:cabD,  h:cabH,    label:`Vanity ${w}mm side-R`,  edge:'1L1S'});
+      hmrParts.push({w:backW, h:cabD,    label:`Vanity ${w}mm top`,     edge:'4sides'});
+      hmrParts.push({w:backW, h:cabD,    label:`Vanity ${w}mm bottom`,  edge:'4sides'});
+      hmrParts.push({w:backW, h:cabH,    label:`Vanity ${w}mm back`,    edge:'none'});
+      const doorH   = options.has_drawer ? (cabH-170-3) : (cabH-3);
+      const singleW = w<900 ? (w-3) : Math.floor((w-3)/2);
+      if(options.has_door !== false){
+        colourParts.push({w:singleW, h:doorH, label:`Vanity ${w}mm door`, edge:'4sides', board:`${fT}mm MDF`});
+        if(w>=900) colourParts.push({w:Math.ceil((w-3)/2), h:doorH, label:`Vanity ${w}mm door-2`, edge:'4sides', board:`${fT}mm MDF`});
+      }
+      if(options.has_drawer) colourParts.push({w:w-3, h:166, label:`Vanity ${w}mm drawer-front`, edge:'4sides', board:`${fT}mm MDF`});
     }
   }
-  
   return {hmrParts, colourParts};
 }
 
@@ -4193,10 +4279,12 @@ function calculateEstimateFromPlan(plan, margin, labourRate, displayMode, rates=
   };
 
   // Sheet materials
-  add('PANEL-16', '16mm HMR Board (2400×1200mm)',         hmrSheets,    'sheet', hmrPrice,    'hmr');
-  add('PANEL-18', '18mm Colour Board (2400×1200mm)',       colourSheets, 'sheet', colourPrice, 'colour');
-  if(whiteRolls)  add('EDGETAPE-W', `White Edge Tape 22mm (${whiteEdgeM}m — carcass/HMR)`,   whiteRolls,  'roll', getPrice('Edge Tape',18), 'edgetape');
-  if(colourRolls) add('EDGETAPE-C', `Colour Edge Tape 22mm (${colourEdgeM}m — doors/panels)`, colourRolls, 'roll', getPrice('Edge Tape',18), 'edgetape');
+  const fT = CALC_RULES.frontBoard.thickness || 18;
+  const fM = CALC_RULES.frontBoard.material  || 'MDF';
+  add('PANEL-16', `16mm HMR Board (2400×1200mm)`,         hmrSheets,    'sheet', hmrPrice,    'hmr');
+  add('PANEL-MDF', `${fT}mm ${fM} Board (2400×1200mm)`,  colourSheets, 'sheet', colourPrice, 'colour');
+  if(whiteRolls)  add('EDGETAPE-W', `White Edge Tape 22mm (${whiteEdgeM}m — 16mm HMR carcass)`, whiteRolls, 'roll', getPrice('Edge Tape',18), 'edgetape');
+  if(colourRolls) add('EDGETAPE-C', `Colour Edge Tape 22mm (${colourEdgeM}m — ${fT}mm ${fM} doors/fronts)`, colourRolls, 'roll', getPrice('Edge Tape',18), 'edgetape');
 
   // Hardware
   if(totalHinges)  add('HINGE-SC',  'Soft Close Hinge',           totalHinges,  'pair', getPrice('Soft Close Hinge',12),    'hardware');
@@ -4217,7 +4305,7 @@ function calculateEstimateFromPlan(plan, margin, labourRate, displayMode, rates=
   const installHrs   = fmt2(totalCabs * 1.5 + totalDoors * 0.3 + totalDrawers * 0.3 + (plan.benchtop_lm||0) * 0.5);
 
   const labour = [
-    {task:`Machine time — cutting ${totalBoards} boards (${hmrSheets} HMR + ${colourSheets} colour)`, hours:machineHrs, rate:machinRate,   total:fmt2(machineHrs*machinRate),   category:'machine'},
+    {task:`Machine time — cutting ${totalBoards} boards (${hmrSheets}× 16mm HMR + ${colourSheets}× ${fT}mm ${fM})`, hours:machineHrs, rate:machinRate,   total:fmt2(machineHrs*machinRate),   category:'machine'},
     {task:`Assembly — ${totalCabs} cabinets (${totalBase} base, ${totalWall} wall, ${totalTall} tall, ${totalVanity} vanity) + ${totalDrawers} drawers`, hours:assemblyHrs, rate:assemblyRate, total:fmt2(assemblyHrs*assemblyRate), category:'assembly'},
     {task:`Installation & fitting`,                                                                    hours:installHrs, rate:labourRate,    total:fmt2(installHrs*labourRate),   category:'install'},
   ];
@@ -4250,6 +4338,215 @@ function clearEstimate(){
   f('est-benchtop'); f('est-special-req');
   const t=document.getElementById('est-combined-total'); if(t) t.style.display='none';
   renderEstimateItems();
+}
+
+// ── Calculation Rules CSV ─────────────────────────────────
+const CALC_RULES_CSV_HEADER = 'SECTION,RULE,VALUE,UNIT,NOTES';
+
+function calcRulesToCSV(){
+  const cr = CALC_RULES;
+  const rows = [
+    CALC_RULES_CSV_HEADER,
+    // CARCASS
+    `CARCASS,board_material,${cr.carcassBoard.material},,Always HMR for all carcass parts`,
+    `CARCASS,board_thickness_mm,${cr.carcassBoard.thickness},mm,16mm HMR sides/top/bottom/shelf/back`,
+    `CARCASS,sheet_width_mm,${cr.carcassBoard.sheetW},mm,Standard sheet width`,
+    `CARCASS,sheet_height_mm,${cr.carcassBoard.sheetH},mm,Standard sheet height`,
+    // FRONT
+    `FRONT,board_material,${cr.frontBoard.material},,MDF — confirm per job (16 or 18mm)`,
+    `FRONT,board_thickness_mm,${cr.frontBoard.thickness},mm,16 or 18mm MDF`,
+    `FRONT,sheet_width_mm,${cr.frontBoard.sheetW},mm,Standard sheet width`,
+    `FRONT,sheet_height_mm,${cr.frontBoard.sheetH},mm,Standard sheet height`,
+    // KICKBOARD
+    `KICKBOARD,material,${cr.kickboard.material},,16mm HMR`,
+    `KICKBOARD,height_mm,${cr.kickboard.height},mm,Standard toekick height`,
+    `KICKBOARD,include_default,yes,,yes/no`,
+    // BASE_CABINET
+    `BASE_CABINET,height_mm,${typeof BASE_H!=='undefined'?BASE_H:720},mm,Internal height`,
+    `BASE_CABINET,depth_mm,${typeof BASE_D!=='undefined'?BASE_D:560},mm,Internal depth`,
+    `BASE_CABINET,door_gap_mm,3,mm,Gap around door`,
+    `BASE_CABINET,drawer_front_height_mm,166,mm,Standard drawer front height`,
+    // WALL_CABINET
+    `WALL_CABINET,height_mm,${typeof WALL_H!=='undefined'?WALL_H:700},mm,Standard overhead height`,
+    `WALL_CABINET,depth_mm,${typeof WALL_D!=='undefined'?WALL_D:300},mm,Standard overhead depth`,
+    // TALL_CABINET
+    `TALL_CABINET,height_mm,2400,mm,Use ceiling height from plan`,
+    `TALL_CABINET,depth_mm,560,mm,Same as base cabinet`,
+    `TALL_CABINET,doors,2,each,Always 2 doors - top and bottom half`,
+    // VANITY_CABINET
+    `VANITY_CABINET,height_mm,720,mm,Standard vanity height`,
+    `VANITY_CABINET,depth_mm,450,mm,Shallower than kitchen base`,
+    // EDGE_TAPE
+    `EDGE_TAPE,carcass_type,White,,White tape for HMR carcass`,
+    `EDGE_TAPE,front_type,Colour,,Colour tape for MDF doors and fronts`,
+    `EDGE_TAPE,roll_length_m,${cr.edgeTapeRollM},m,Each roll length`,
+    `EDGE_TAPE,sides_rule,1L+1S,,Cabinet sides: 1 long + 1 short`,
+    `EDGE_TAPE,shelf_rule,4sides,,Shelves tops bottoms: all 4 sides`,
+    `EDGE_TAPE,back_rule,none,,Backs are NOT taped`,
+    `EDGE_TAPE,door_rule,4sides,,All 4 sides of doors and drawer fronts`,
+    // HARDWARE
+    `HARDWARE,hinges_per_door,2,pairs,Soft-close hinges per door`,
+    `HARDWARE,slides_per_drawer,1,pair,Per drawer`,
+    `HARDWARE,handles_include,yes,,1 per door and drawer front`,
+    `HARDWARE,legs_per_base_cab,4,each,Per base/vanity cabinet`,
+    // LABOUR_MACHINE
+    `LABOUR_MACHINE,min_per_board,${cr.machineMinPerBoard},min,Minutes per board`,
+    `LABOUR_MACHINE,rate_per_hr,${PRICING_DB.machineRate||60},AUD,Default rate`,
+    // LABOUR_ASSEMBLY
+    `LABOUR_ASSEMBLY,min_per_base_cab,${cr.assemblyMinPerCab},min,Per base/wall/vanity`,
+    `LABOUR_ASSEMBLY,min_per_tall_cab,${cr.assemblyMinTall},min,Per tall cabinet`,
+    `LABOUR_ASSEMBLY,min_extra_drawer,${cr.assemblyMinDrawer},min,Extra per drawer`,
+    `LABOUR_ASSEMBLY,rate_per_hr,${PRICING_DB.assemblyRate||85},AUD,Default rate`,
+    // LABOUR_INSTALL
+    `LABOUR_INSTALL,hr_per_cabinet,1.5,hr,Per cabinet`,
+    `LABOUR_INSTALL,hr_per_door,0.3,hr,Per door`,
+    `LABOUR_INSTALL,hr_per_drawer,0.3,hr,Per drawer`,
+    `LABOUR_INSTALL,hr_per_lm_bench,0.5,hr,Per lm benchtop`,
+    `LABOUR_INSTALL,rate_per_hr,${PRICING_DB.labourRate||85},AUD,Default rate`,
+    // BOARDS
+    `BOARDS,saw_kerf_mm,${cr.kerfMm},mm,Blade kerf allowance`,
+    `BOARDS,hmr_price_per_sheet,58,AUD,Update with your actual price`,
+    `BOARDS,mdf_18_price_per_sheet,65,AUD,Update with your actual price`,
+    `BOARDS,mdf_16_price_per_sheet,60,AUD,Update with your actual price`,
+    `BOARDS,edge_tape_price_per_roll,18,AUD,Per 50m roll`,
+    // PRICING
+    `PRICING,default_margin_pct,${PRICING_DB.margin||30},%,Applied to grand total`,
+    `PRICING,margin_applies_to,total,,Materials+Labour combined`,
+  ];
+  return rows.join('\n');
+}
+
+function downloadCalcRulesCSV(){
+  const csv = calcRulesToCSV();
+  const blob = new Blob([csv], {type:'text/csv'});
+  const url  = URL.createObjectURL(blob);
+  const a    = document.createElement('a');
+  a.href = url; a.download = 'VIP_Cabinets_Calculation_Rules.csv';
+  a.click(); URL.revokeObjectURL(url);
+  toast('✅ Calculation rules exported');
+}
+
+function loadCalcRulesCSV(file){
+  if(!file) return;
+  const reader = new FileReader();
+  reader.onload = e => {
+    try{
+      const lines = e.target.result.split('\n').filter(l=>l.trim()&&!l.startsWith('SECTION'));
+      let changed = 0;
+      lines.forEach(line => {
+        const parts = line.split(',');
+        if(parts.length < 3) return;
+        const section = parts[0].trim().toUpperCase();
+        const rule    = parts[1].trim().toLowerCase();
+        const value   = parts[2].trim();
+        const num     = parseFloat(value);
+
+        // Apply to CALC_RULES
+        if(section==='CARCASS'){
+          if(rule==='board_thickness_mm' && num) CALC_RULES.carcassBoard.thickness=num;
+          if(rule==='sheet_width_mm'  && num) CALC_RULES.carcassBoard.sheetW=num;
+          if(rule==='sheet_height_mm' && num) CALC_RULES.carcassBoard.sheetH=num;
+        }
+        if(section==='FRONT'){
+          if(rule==='board_thickness_mm' && num) CALC_RULES.frontBoard.thickness=num;
+          if(rule==='board_material')            CALC_RULES.frontBoard.material=value;
+          if(rule==='sheet_width_mm'  && num) CALC_RULES.frontBoard.sheetW=num;
+          if(rule==='sheet_height_mm' && num) CALC_RULES.frontBoard.sheetH=num;
+        }
+        if(section==='KICKBOARD'){
+          if(rule==='height_mm' && num) CALC_RULES.kickboard.height=num;
+          if(rule==='material')         CALC_RULES.kickboard.material=value;
+        }
+        if(section==='EDGE_TAPE'){
+          if(rule==='roll_length_m' && num) CALC_RULES.edgeTapeRollM=num;
+        }
+        if(section==='LABOUR_MACHINE'){
+          if(rule==='min_per_board' && num) CALC_RULES.machineMinPerBoard=num;
+          if(rule==='rate_per_hr'   && num) PRICING_DB.machineRate=num;
+        }
+        if(section==='LABOUR_ASSEMBLY'){
+          if(rule==='min_per_base_cab' && num) CALC_RULES.assemblyMinPerCab=num;
+          if(rule==='min_per_tall_cab' && num) CALC_RULES.assemblyMinTall=num;
+          if(rule==='min_extra_drawer' && num) CALC_RULES.assemblyMinDrawer=num;
+          if(rule==='rate_per_hr'      && num) PRICING_DB.assemblyRate=num;
+        }
+        if(section==='LABOUR_INSTALL'){
+          if(rule==='rate_per_hr' && num) PRICING_DB.labourRate=num;
+        }
+        if(section==='BOARDS'){
+          if(rule==='saw_kerf_mm' && num) CALC_RULES.kerfMm=num;
+        }
+        if(section==='PRICING'){
+          if(rule==='default_margin_pct' && num) PRICING_DB.margin=num;
+        }
+        changed++;
+      });
+
+      // Save to localStorage
+      localStorage.setItem('pah_calc_rules', JSON.stringify(CALC_RULES));
+      localStorage.setItem('pah_pricing_db',  JSON.stringify(PRICING_DB));
+
+      // Update UI
+      renderCalcRulesPreview();
+      saveToGitHub();
+
+      const st = document.getElementById('calc-rules-status');
+      if(st){ st.style.display='block'; st.style.background='rgba(63,185,80,0.1)'; st.style.border='1px solid rgba(63,185,80,0.3)'; st.style.color='var(--green)'; st.textContent=`✅ Loaded ${changed} rules from ${file.name} — synced to all devices`; }
+      toast('✅ Calculation rules updated!');
+    }catch(err){
+      toast('❌ CSV error: '+err.message);
+    }
+  };
+  reader.readAsText(file);
+}
+
+function renderCalcRulesPreview(){
+  const cr = CALC_RULES;
+  const set = (id,html) => { const el=document.getElementById(id); if(el) el.innerHTML=html; };
+  set('cr-carcass', [
+    `Sides/top/bottom/shelf/back: <strong>${cr.carcassBoard.thickness}mm ${cr.carcassBoard.material}</strong>`,
+    `Sheet size: <strong>${cr.carcassBoard.sheetW}×${cr.carcassBoard.sheetH}mm</strong>`,
+    `Kickboard: <strong>${cr.kickboard.height}mm ${cr.kickboard.material}</strong>`,
+    `Edge tape: <strong>White</strong>`,
+  ].join('<br>'));
+  set('cr-front', [
+    `Doors & drawer fronts: <strong>${cr.frontBoard.thickness}mm ${cr.frontBoard.material}</strong>`,
+    `Sheet size: <strong>${cr.frontBoard.sheetW}×${cr.frontBoard.sheetH}mm</strong>`,
+    `Edge tape: <strong>Colour (all 4 sides)</strong>`,
+  ].join('<br>'));
+  set('cr-dims', [
+    `Base: <strong>H${typeof BASE_H!=='undefined'?BASE_H:720} × D${typeof BASE_D!=='undefined'?BASE_D:560}mm</strong>`,
+    `Wall: <strong>H${typeof WALL_H!=='undefined'?WALL_H:700} × D${typeof WALL_D!=='undefined'?WALL_D:300}mm</strong>`,
+    `Drawer front height: <strong>166mm</strong>`,
+    `Saw kerf: <strong>${cr.kerfMm}mm</strong>`,
+  ].join('<br>'));
+  set('cr-labour', [
+    `Machine: <strong>${cr.machineMinPerBoard} min/board</strong> @ <strong>$${PRICING_DB.machineRate||60}/hr</strong>`,
+    `Assembly: <strong>${cr.assemblyMinPerCab} min/cab</strong>, tall: <strong>${cr.assemblyMinTall} min</strong>`,
+    `Drawer extra: <strong>${cr.assemblyMinDrawer} min</strong> @ <strong>$${PRICING_DB.assemblyRate||85}/hr</strong>`,
+    `Install: <strong>$${PRICING_DB.labourRate||85}/hr</strong>`,
+  ].join('<br>'));
+}
+
+// Load CALC_RULES from localStorage on startup
+function loadCalcRulesFromStorage(){
+  try{
+    const saved = localStorage.getItem('pah_calc_rules');
+    if(saved){
+      const parsed = JSON.parse(saved);
+      CALC_RULES = {...CALC_RULES, ...parsed};
+      if(parsed.carcassBoard) CALC_RULES.carcassBoard = {...CALC_RULES.carcassBoard, ...parsed.carcassBoard};
+      if(parsed.frontBoard)   CALC_RULES.frontBoard   = {...CALC_RULES.frontBoard,   ...parsed.frontBoard};
+      if(parsed.kickboard)    CALC_RULES.kickboard    = {...CALC_RULES.kickboard,    ...parsed.kickboard};
+    }
+  }catch(e){}
+}
+
+function updateFrontMaterial(val){
+  const map = {'18mdf':{t:18,m:'MDF'},'16mdf':{t:16,m:'MDF'},'18hmr':{t:18,m:'HMR'},'16hmr':{t:16,m:'HMR'}};
+  const chosen = map[val] || {t:18,m:'MDF'};
+  CALC_RULES.frontBoard.thickness = chosen.t;
+  CALC_RULES.frontBoard.material  = chosen.m;
 }
 
 function loadSpecsFromDefaults(){
