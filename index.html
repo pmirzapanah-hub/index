@@ -812,9 +812,9 @@ body::before{content:'';position:fixed;inset:0;background:repeating-linear-gradi
       </div>
       <div class="page-body" id="est-page-body">
 
-        <!-- client info -->
+        <!-- client intake form -->
         <div class="est-section">
-          <div class="est-section-title">Client & Project</div>
+          <div class="est-section-title">Client & Project Details</div>
           <div class="est-form">
             <div><label style="font-size:0.78rem;color:var(--text-dim);display:block;margin-bottom:4px">Client Name *</label>
               <input class="modal-input" id="est-client" placeholder="e.g. John Smith"/></div>
@@ -822,6 +822,37 @@ body::before{content:'';position:fixed;inset:0;background:repeating-linear-gradi
               <input class="modal-input" id="est-address" placeholder="e.g. 12 Main St, Brisbane QLD"/></div>
             <div><label style="font-size:0.78rem;color:var(--text-dim);display:block;margin-bottom:4px">Estimate Date</label>
               <input class="modal-input" type="date" id="est-date"/></div>
+            <div><label style="font-size:0.78rem;color:var(--text-dim);display:block;margin-bottom:4px">Budget Range (AUD)</label>
+              <input class="modal-input" id="est-budget" placeholder="e.g. $15,000 – $20,000"/></div>
+            <div><label style="font-size:0.78rem;color:var(--text-dim);display:block;margin-bottom:4px">Timeline / Deadline</label>
+              <input class="modal-input" id="est-timeline" placeholder="e.g. 6 weeks, by March 2026"/></div>
+          </div>
+        </div>
+
+        <!-- room & specification details -->
+        <div class="est-section">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
+            <div class="est-section-title" style="margin:0">Project Specifications</div>
+            <button class="btn btn-ghost btn-sm" onclick="loadSpecsFromDefaults()" title="Load defaults for selected project type">↺ Load Defaults</button>
+          </div>
+          <div class="est-form">
+            <div><label style="font-size:0.78rem;color:var(--text-dim);display:block;margin-bottom:4px">Room Width (mm)</label>
+              <input class="modal-input" type="number" id="est-room-width" placeholder="e.g. 3600"/></div>
+            <div><label style="font-size:0.78rem;color:var(--text-dim);display:block;margin-bottom:4px">Room Depth (mm)</label>
+              <input class="modal-input" type="number" id="est-room-depth" placeholder="e.g. 2400"/></div>
+            <div><label style="font-size:0.78rem;color:var(--text-dim);display:block;margin-bottom:4px">Ceiling Height (mm)</label>
+              <input class="modal-input" type="number" id="est-ceiling" placeholder="e.g. 2400"/></div>
+            <div><label style="font-size:0.78rem;color:var(--text-dim);display:block;margin-bottom:4px">Board Colour / Finish</label>
+              <input class="modal-input" id="est-board-colour" placeholder="e.g. White Satin"/></div>
+            <div><label style="font-size:0.78rem;color:var(--text-dim);display:block;margin-bottom:4px">Hinge Type</label>
+              <input class="modal-input" id="est-hinge-type" placeholder="e.g. Blum Clip Top Soft-Close"/></div>
+            <div><label style="font-size:0.78rem;color:var(--text-dim);display:block;margin-bottom:4px">Handle Style & Size</label>
+              <input class="modal-input" id="est-handle-style" placeholder="e.g. Bar Handle 160mm Black"/></div>
+            <div><label style="font-size:0.78rem;color:var(--text-dim);display:block;margin-bottom:4px">Benchtop Material</label>
+              <input class="modal-input" id="est-benchtop" placeholder="e.g. Laminate, Stone, Timber"/></div>
+          </div>
+          <div style="margin-top:10px"><label style="font-size:0.78rem;color:var(--text-dim);display:block;margin-bottom:4px">Special Requirements</label>
+            <textarea class="modal-input" id="est-special-req" rows="2" placeholder="e.g. Soft-close all hinges and drawers, pull-out bin, corner unit, integrated fridge panels…"></textarea>
           </div>
         </div>
 
@@ -952,6 +983,52 @@ body::before{content:'';position:fixed;inset:0;background:repeating-linear-gradi
         <div class="page-section" id="user-accounts-section">
           <div class="page-section-head"><h3>User Accounts</h3><button id="add-user-btn" class="btn btn-primary btn-sm" onclick="openAddUserModal()">＋ Add User</button></div>
           <div class="settings-group" id="users-list" style="padding:10px"></div>
+        </div>
+
+        <div class="page-section" id="settings-project-defaults">
+          <div class="page-section-head"><h3>🏗️ Project Type Defaults</h3>
+            <button class="btn btn-primary btn-sm" onclick="saveProjectDefaults()">💾 Save Defaults</button>
+          </div>
+          <div class="settings-group">
+            <p style="font-size:0.78rem;color:var(--text-dim);margin-bottom:12px;line-height:1.6">
+              Set default materials, hardware and dimensions for each project type. These pre-fill the estimator and guide the AI when reading plans.
+            </p>
+            <label style="font-size:0.78rem;color:var(--text-dim);display:block;margin-bottom:6px">Project Type</label>
+            <select class="modal-input" id="pd-type-select" onchange="loadProjectDefaultsForm(this.value)" style="margin-bottom:14px">
+              <option>Kitchen Cabinets</option>
+              <option>Bathroom Vanity</option>
+              <option>Laundry Joinery</option>
+              <option>Wardrobe / Robe</option>
+              <option>Custom Joinery</option>
+              <option>Full Renovation</option>
+            </select>
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+              <div><label style="font-size:0.75rem;color:var(--text-dim);display:block;margin-bottom:4px">Board Colour / Finish</label>
+                <input class="modal-input" id="pd-boardColour" placeholder="e.g. White Satin, Linen, Graphite"/></div>
+              <div><label style="font-size:0.75rem;color:var(--text-dim);display:block;margin-bottom:4px">Hinge Type</label>
+                <input class="modal-input" id="pd-hingeType" placeholder="e.g. Blum Clip Top Soft-Close"/></div>
+              <div><label style="font-size:0.75rem;color:var(--text-dim);display:block;margin-bottom:4px">Handle Style & Size</label>
+                <input class="modal-input" id="pd-handleStyle" placeholder="e.g. Bar Handle 160mm Black"/></div>
+              <div><label style="font-size:0.75rem;color:var(--text-dim);display:block;margin-bottom:4px">Benchtop Material</label>
+                <input class="modal-input" id="pd-benchtop" placeholder="e.g. Laminate, Stone, Timber"/></div>
+              <div><label style="font-size:0.75rem;color:var(--text-dim);display:block;margin-bottom:4px">Carcass Thickness (mm)</label>
+                <input class="modal-input" type="number" id="pd-carcassThicknessMm" placeholder="16"/></div>
+              <div><label style="font-size:0.75rem;color:var(--text-dim);display:block;margin-bottom:4px">Door/Front Thickness (mm)</label>
+                <input class="modal-input" type="number" id="pd-frontThicknessMm" placeholder="18"/></div>
+              <div><label style="font-size:0.75rem;color:var(--text-dim);display:block;margin-bottom:4px">Base Cabinet Height (mm)</label>
+                <input class="modal-input" type="number" id="pd-baseHeightMm" placeholder="720"/></div>
+              <div><label style="font-size:0.75rem;color:var(--text-dim);display:block;margin-bottom:4px">Wall Cabinet Height (mm)</label>
+                <input class="modal-input" type="number" id="pd-wallHeightMm" placeholder="700"/></div>
+              <div><label style="font-size:0.75rem;color:var(--text-dim);display:block;margin-bottom:4px">Base Cabinet Depth (mm)</label>
+                <input class="modal-input" type="number" id="pd-baseDepthMm" placeholder="560"/></div>
+              <div><label style="font-size:0.75rem;color:var(--text-dim);display:block;margin-bottom:4px">Wall Cabinet Depth (mm)</label>
+                <input class="modal-input" type="number" id="pd-wallDepthMm" placeholder="300"/></div>
+            </div>
+            <div style="margin-top:12px"><label style="font-size:0.75rem;color:var(--text-dim);display:block;margin-bottom:4px">Special Notes / Standards</label>
+              <textarea class="modal-input" id="pd-specialNotes" rows="2" placeholder="e.g. All hinges soft-close. Use moisture resistant HMR for bathroom."></textarea>
+            </div>
+            <div id="pd-status" style="margin-top:8px;font-size:0.78rem;display:none"></div>
+          </div>
         </div>
 
         <div class="page-section" id="settings-pricing">
@@ -1459,7 +1536,7 @@ async function saveUsersToGitHub(){
     const check=await fetch(url,{headers:{Authorization:`token ${tok}`,Accept:'application/vnd.github.v3+json'}});
     if(check.ok){ const cj=await check.json(); window._ghSha=cj.sha; }
     else { window._ghSha=null; }
-    const payload={tasks:TASKS,projects:PROJECTS,team:TEAM,taskStatuses:TASK_STATUSES,users:USERS,notifConfig:NOTIF_CONFIG,notifPrefs:NOTIF_PREFS,reminderIntervals:REMINDER_INTERVALS,pricingDB:PRICING_DB,savedAt:new Date().toISOString()};
+    const payload={tasks:TASKS,projects:PROJECTS,team:TEAM,taskStatuses:TASK_STATUSES,users:USERS,notifConfig:NOTIF_CONFIG,notifPrefs:NOTIF_PREFS,reminderIntervals:REMINDER_INTERVALS,pricingDB:PRICING_DB,projectDefaults:PROJECT_DEFAULTS,savedAt:new Date().toISOString()};
     const encoded=btoa(unescape(encodeURIComponent(JSON.stringify(payload,null,2))));
     const body={message:'PAH users update',content:encoded,branch:GH.branch};
     if(window._ghSha) body.sha=window._ghSha;
@@ -1695,6 +1772,7 @@ async function loadFromGitHub(){
     if(decoded.notifPrefs)         NOTIF_PREFS         = {...NOTIF_PREFS,  ...decoded.notifPrefs};
     if(decoded.reminderIntervals && decoded.reminderIntervals.length > 0) REMINDER_INTERVALS = decoded.reminderIntervals;
     if(decoded.pricingDB) PRICING_DB = {...PRICING_DB, ...decoded.pricingDB};
+    if(decoded.projectDefaults){ Object.keys(decoded.projectDefaults).forEach(k=>{ if(PROJECT_DEFAULTS[k]) PROJECT_DEFAULTS[k]={...PROJECT_DEFAULTS[k],...decoded.projectDefaults[k]}; }); }
     // mirror to localStorage as cache
     localStorage.setItem('pah_notif_config',      JSON.stringify(NOTIF_CONFIG));
     localStorage.setItem('pah_notif_prefs',       JSON.stringify(NOTIF_PREFS));
@@ -1716,7 +1794,7 @@ async function saveToGitHub(){
     const check=await fetch(url,{headers:{Authorization:`token ${tok}`,Accept:'application/vnd.github.v3+json'}});
     if(check.ok){ const cj=await check.json(); window._ghSha=cj.sha; }
     else { window._ghSha=null; }
-    const payload={tasks:TASKS,projects:PROJECTS,team:TEAM,taskStatuses:TASK_STATUSES,users:USERS,notifConfig:NOTIF_CONFIG,notifPrefs:NOTIF_PREFS,reminderIntervals:REMINDER_INTERVALS,pricingDB:PRICING_DB,savedAt:new Date().toISOString()};
+    const payload={tasks:TASKS,projects:PROJECTS,team:TEAM,taskStatuses:TASK_STATUSES,users:USERS,notifConfig:NOTIF_CONFIG,notifPrefs:NOTIF_PREFS,reminderIntervals:REMINDER_INTERVALS,pricingDB:PRICING_DB,projectDefaults:PROJECT_DEFAULTS,savedAt:new Date().toISOString()};
     const encoded=btoa(unescape(encodeURIComponent(JSON.stringify(payload,null,2))));
     const body={message:'PAH update '+new Date().toLocaleString(),content:encoded,branch:GH.branch};
     if(window._ghSha) body.sha=window._ghSha;
@@ -2429,7 +2507,7 @@ function goTo(page){
   if(page==='onedrive') syncFullOdView();
   if(page==='reports') renderReports();
   if(page==='estimator'){ /* nothing to render */ }
-  if(page==='settings'){ renderTaskStatusList(); renderUsersList(); populateNotifSettings(); populateProfileSettings(); populatePricingSettings(); renderReminderSchedule(); updateGhTokenUI(); loadUsersFromGitHub().then(()=>{ renderUsersList(); populateProfileSettings(); populateNotifSettings(); renderReminderSchedule(); }); }
+  if(page==='settings'){ renderTaskStatusList(); renderUsersList(); populateNotifSettings(); populateProfileSettings(); populatePricingSettings(); renderReminderSchedule(); updateGhTokenUI(); loadProjectDefaultsForm(); loadUsersFromGitHub().then(()=>{ renderUsersList(); populateProfileSettings(); populateNotifSettings(); renderReminderSchedule(); }); }
   closeSidebar();
 }
 
@@ -3029,10 +3107,93 @@ let PRICING_DB = {
   items: []
 };
 
+// Project type defaults — saved to data.json
+let PROJECT_DEFAULTS = {
+  'Kitchen Cabinets': {
+    boardColour: 'White Satin', hingeType: 'Blum Clip Top Soft-Close', handleStyle: 'Bar Handle 160mm',
+    benchtop: 'Laminate', carcassThicknessMm: 16, frontThicknessMm: 18,
+    baseHeightMm: 720, wallHeightMm: 700, baseDepthMm: 560, wallDepthMm: 300,
+    specialNotes: 'All hinges soft-close. All drawers soft-close.'
+  },
+  'Bathroom Vanity': {
+    boardColour: 'White Satin', hingeType: 'Blum Clip Top Soft-Close', handleStyle: 'Cup Pull Handle',
+    benchtop: 'Stone', carcassThicknessMm: 16, frontThicknessMm: 18,
+    baseHeightMm: 720, wallHeightMm: 700, baseDepthMm: 450, wallDepthMm: 300,
+    specialNotes: 'Use moisture resistant HMR throughout.'
+  },
+  'Laundry Joinery': {
+    boardColour: 'White Satin', hingeType: 'Blum Clip Top Soft-Close', handleStyle: 'Bar Handle 160mm',
+    benchtop: 'Laminate', carcassThicknessMm: 16, frontThicknessMm: 18,
+    baseHeightMm: 860, wallHeightMm: 700, baseDepthMm: 560, wallDepthMm: 300,
+    specialNotes: 'Allow space for washing machine and dryer.'
+  },
+  'Wardrobe / Robe': {
+    boardColour: 'White Satin', hingeType: 'Blum Clip Top Soft-Close', handleStyle: 'Bar Handle 160mm',
+    benchtop: 'None', carcassThicknessMm: 16, frontThicknessMm: 18,
+    baseHeightMm: 2100, wallHeightMm: 2100, baseDepthMm: 580, wallDepthMm: 580,
+    specialNotes: 'Include hanging rail and shelf above.'
+  },
+  'Custom Joinery': {
+    boardColour: 'White Satin', hingeType: 'Blum Clip Top Soft-Close', handleStyle: 'Bar Handle 160mm',
+    benchtop: 'Laminate', carcassThicknessMm: 16, frontThicknessMm: 18,
+    baseHeightMm: 720, wallHeightMm: 700, baseDepthMm: 560, wallDepthMm: 300,
+    specialNotes: ''
+  },
+  'Full Renovation': {
+    boardColour: 'White Satin', hingeType: 'Blum Clip Top Soft-Close', handleStyle: 'Bar Handle 160mm',
+    benchtop: 'Laminate', carcassThicknessMm: 16, frontThicknessMm: 18,
+    baseHeightMm: 720, wallHeightMm: 700, baseDepthMm: 560, wallDepthMm: 300,
+    specialNotes: 'All soft-close hardware throughout.'
+  }
+};
+
+// ── Project Defaults (Settings) ───────────────────────────
+function loadProjectDefaultsForm(type){
+  const t = type || document.getElementById('pd-type-select')?.value || 'Kitchen Cabinets';
+  const d = PROJECT_DEFAULTS[t] || {};
+  const set = (id,val) => { const el=document.getElementById(id); if(el) el.value=val||''; };
+  set('pd-boardColour',       d.boardColour);
+  set('pd-hingeType',         d.hingeType);
+  set('pd-handleStyle',       d.handleStyle);
+  set('pd-benchtop',          d.benchtop);
+  set('pd-carcassThicknessMm',d.carcassThicknessMm||16);
+  set('pd-frontThicknessMm',  d.frontThicknessMm||18);
+  set('pd-baseHeightMm',      d.baseHeightMm||720);
+  set('pd-wallHeightMm',      d.wallHeightMm||700);
+  set('pd-baseDepthMm',       d.baseDepthMm||560);
+  set('pd-wallDepthMm',       d.wallDepthMm||300);
+  set('pd-specialNotes',      d.specialNotes);
+}
+
+function saveProjectDefaults(){
+  const t = document.getElementById('pd-type-select')?.value || 'Kitchen Cabinets';
+  const get = id => document.getElementById(id)?.value?.trim()||'';
+  const getN= id => parseFloat(document.getElementById(id)?.value)||0;
+  PROJECT_DEFAULTS[t] = {
+    boardColour:        get('pd-boardColour'),
+    hingeType:          get('pd-hingeType'),
+    handleStyle:        get('pd-handleStyle'),
+    benchtop:           get('pd-benchtop'),
+    carcassThicknessMm: getN('pd-carcassThicknessMm')||16,
+    frontThicknessMm:   getN('pd-frontThicknessMm')||18,
+    baseHeightMm:       getN('pd-baseHeightMm')||720,
+    wallHeightMm:       getN('pd-wallHeightMm')||700,
+    baseDepthMm:        getN('pd-baseDepthMm')||560,
+    wallDepthMm:        getN('pd-wallDepthMm')||300,
+    specialNotes:       get('pd-specialNotes'),
+  };
+  localStorage.setItem('pah_project_defaults', JSON.stringify(PROJECT_DEFAULTS));
+  saveToGitHub();
+  const st=document.getElementById('pd-status');
+  if(st){ st.style.display='block'; st.style.color='var(--green)'; st.textContent='✅ Defaults saved for '+t; setTimeout(()=>st.style.display='none',3000); }
+}
+
 function loadPricingSettings(){
   try{
     const p = localStorage.getItem('pah_pricing_db');
     if(p) PRICING_DB = {...PRICING_DB, ...JSON.parse(p)};
+    const pd = localStorage.getItem('pah_project_defaults');
+    if(pd){ const parsed=JSON.parse(pd); Object.keys(parsed).forEach(k=>{ if(PROJECT_DEFAULTS[k]) PROJECT_DEFAULTS[k]={...PROJECT_DEFAULTS[k],...parsed[k]}; }); }
   }catch(e){}
 }
 
@@ -3832,8 +3993,8 @@ function getCabinetParts(type, width_mm, qty, options={}){
   const colourParts = []; // 18mm Colour board (doors, drawer fronts, visible ends)
   
   if(type === 'base'){
-    const h = 720;    // internal height (floor to underside of bench)
-    const d = 560;    // internal depth
+    const h = (options.baseH||BASE_H) - 0;    // internal height
+    const d = options.baseD||BASE_D;    // internal depth
     const backH = h;
     const backW = w - 36; // inset back
     
@@ -3855,8 +4016,8 @@ function getCabinetParts(type, width_mm, qty, options={}){
   }
   
   else if(type === 'wall'){
-    const h = 700;   // standard overhead height
-    const d = 300;   // depth
+    const h = options.wallH||WALL_H;   // overhead height
+    const d = options.wallD||WALL_D;   // depth
     const backH = h;
     const backW = w - 36;
     
@@ -3928,7 +4089,13 @@ function calculateEstimateFromPlan(plan, margin, labourRate, displayMode, rates=
   const wallCabs  = cab.wall   || [];
   const tallCabs  = cab.tall   || [];
   const vanCabs   = cab.vanity || [];
-  const ceilH     = plan.ceiling_height_mm || 2400;
+  const specs = rates.specs || {};
+  const pd = PROJECT_DEFAULTS[specs.type||'Kitchen Cabinets'] || {};
+  const ceilH     = plan.ceiling_height_mm || specs.ceiling || pd.baseHeightMm || 2400;
+  const BASE_H    = specs.baseH || pd.baseHeightMm || 720;
+  const WALL_H    = specs.wallH || pd.wallHeightMm || 700;
+  const BASE_D    = specs.baseD || pd.baseDepthMm  || 560;
+  const WALL_D    = specs.wallD || pd.wallDepthMm  || 300;
 
   // ── STEP 1: Decompose all cabinets into individual parts ──
   let allHMRParts = [];
@@ -4077,9 +4244,25 @@ function clearEstimate(){
   estimateItems=[{id:1,name:'Area 1',type:'Kitchen Cabinets',fileData:null,fileType:null,mimeType:null,estimate:null,status:'empty',notes:'',overrideMargin:0,overrideLabour:0}];
   nextItemId=2;
   const f=id=>{ const el=document.getElementById(id); if(el) el.value=''; };
-  f('est-client'); f('est-address'); f('est-date');
+  f('est-client'); f('est-address'); f('est-date'); f('est-budget'); f('est-timeline');
+  f('est-room-width'); f('est-room-depth'); f('est-ceiling');
+  f('est-board-colour'); f('est-hinge-type'); f('est-handle-style');
+  f('est-benchtop'); f('est-special-req');
   const t=document.getElementById('est-combined-total'); if(t) t.style.display='none';
   renderEstimateItems();
+}
+
+function loadSpecsFromDefaults(){
+  // Find the first area's type or fall back to 'Kitchen Cabinets'
+  const type = estimateItems[0]?.type || 'Kitchen Cabinets';
+  const d = PROJECT_DEFAULTS[type] || {};
+  const set = (id,val) => { const el=document.getElementById(id); if(el&&val) el.value=val; };
+  set('est-board-colour',  d.boardColour);
+  set('est-hinge-type',    d.hingeType);
+  set('est-handle-style',  d.handleStyle);
+  set('est-benchtop',      d.benchtop);
+  if(d.specialNotes){ const el=document.getElementById('est-special-req'); if(el&&!el.value) el.value=d.specialNotes; }
+  toast('✅ Defaults loaded for ' + type);
 }
 
 function updateEstOverrideHints(){} // kept for compat
