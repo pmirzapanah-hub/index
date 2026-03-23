@@ -1,29 +1,187 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
-  <title>Cabinet Estimator</title>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>Cabinet Estimator</title>
+
+<style>
+body {
+  margin: 0;
+  font-family: Arial, sans-serif;
+  background: #f5f6fa;
+}
+
+.app {
+  display: flex;
+  height: 100vh;
+}
+
+/* Sidebar */
+.sidebar {
+  width: 260px;
+  background: #1e1e1e;
+  color: white;
+  padding: 20px;
+}
+
+.sidebar h2 {
+  margin-top: 0;
+}
+
+.sidebar input {
+  width: 100%;
+  padding: 8px;
+  margin-bottom: 10px;
+}
+
+/* Main */
+.main {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+}
+
+/* Top bar */
+.topbar {
+  background: white;
+  padding: 15px 20px;
+  border-bottom: 1px solid #ddd;
+}
+
+/* Content */
+.content {
+  display: flex;
+  flex: 1;
+}
+
+/* Form panel */
+.panel {
+  flex: 1;
+  padding: 20px;
+}
+
+.panel h3 {
+  margin-top: 0;
+}
+
+.panel input, .panel select {
+  width: 100%;
+  padding: 10px;
+  margin-bottom: 12px;
+}
+
+/* Results */
+.results {
+  width: 320px;
+  background: #ffffff;
+  border-left: 1px solid #ddd;
+  padding: 20px;
+}
+
+.result-box {
+  background: #f0f4ff;
+  padding: 15px;
+  border-radius: 10px;
+  margin-bottom: 10px;
+}
+
+button {
+  background: #2A7FFF;
+  color: white;
+  border: none;
+  padding: 12px;
+  cursor: pointer;
+  border-radius: 8px;
+}
+
+button:hover {
+  opacity: 0.9;
+}
+</style>
 </head>
+
 <body>
 
-<h2>Cabinet Estimator</h2>
+<div class="app">
 
-<button onclick="runEstimate()">Estimate</button>
+  <!-- Sidebar -->
+  <div class="sidebar">
+    <h2>VIP Cabinets</h2>
+    <label>Client Name</label>
+    <input id="clientName" placeholder="Enter name"/>
 
-<pre id="output"></pre>
+    <label>Project Address</label>
+    <input id="projectAddress" placeholder="Enter address"/>
+  </div>
+
+  <!-- Main -->
+  <div class="main">
+
+    <div class="topbar">
+      Cabinet Estimator
+    </div>
+
+    <div class="content">
+
+      <!-- Input Panel -->
+      <div class="panel">
+        <h3>Cabinet Details</h3>
+
+        <label>Type</label>
+        <select id="type">
+          <option value="base">Base Cabinet</option>
+          <option value="wall">Wall Cabinet</option>
+        </select>
+
+        <label>Width (mm)</label>
+        <input id="width" type="number" value="900"/>
+
+        <label>Height (mm)</label>
+        <input id="height" type="number" value="720"/>
+
+        <label>Depth (mm)</label>
+        <input id="depth" type="number" value="560"/>
+
+        <button onclick="runEstimate()">Calculate Estimate</button>
+      </div>
+
+      <!-- Results Panel -->
+      <div class="results">
+        <h3>Estimate</h3>
+
+        <div class="result-box">
+          Shelves: <span id="shelves">-</span>
+        </div>
+
+        <div class="result-box">
+          Hinges: <span id="hinges">-</span>
+        </div>
+
+        <div class="result-box">
+          Total Price: $<span id="total">-</span>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+</div>
 
 <script type="module">
 import { estimateCabinet } from './src/estimator.js';
 
 window.runEstimate = async function() {
   const result = await estimateCabinet({
-    type: "base",
-    width: 900,
-    height: 720,
-    depth: 560
+    type: document.getElementById('type').value,
+    width: Number(document.getElementById('width').value),
+    height: Number(document.getElementById('height').value),
+    depth: Number(document.getElementById('depth').value)
   });
 
-  document.getElementById('output').textContent =
-    JSON.stringify(result, null, 2);
+  document.getElementById('shelves').innerText = result.shelves;
+  document.getElementById('hinges').innerText = result.hinges;
+  document.getElementById('total').innerText = result.total.toFixed(2);
 };
 </script>
 
