@@ -41,6 +41,19 @@
     }
   },
 
+  "limits": {
+    "maxDoorWidth": 450,
+    "maxDrawerWidth": 900
+  },
+
+  "appliances": {
+    "dishwasher": { "label": "Dishwasher",     "defaultWidth": 600, "extraFaceboards": 2 },
+    "oven":       { "label": "Oven",            "defaultWidth": 600, "extraFaceboards": 2 },
+    "fridge":     { "label": "Fridge",          "defaultWidth": 900, "extraFaceboards": 2 },
+    "blind":      { "label": "Blind Cabinet",   "defaultWidth": 300, "extraFaceboards": 0 },
+    "other":      { "label": "Other Appliance", "defaultWidth": 600, "extraFaceboards": 2 }
+  },
+
   "formulas": {
     "shelves": "ceil(height / 600) - 1",
     "hinges":  "ceil(height / 700)"

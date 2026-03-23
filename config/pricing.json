@@ -15,7 +15,7 @@
 
   "hardware": {
     "drawerSetCost": 24.00,
-    "comment": "drawerSetCost = runner set + lock per drawer (matches hardware ids in materials.json)"
+    "comment": "drawerSetCost = runner set + lock per drawer"
   },
 
   "minimumCharge": 150,
