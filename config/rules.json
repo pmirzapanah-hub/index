@@ -1,0 +1,18 @@
+{
+  "cabinetTypes": {
+    "base": {
+      "defaultHeight": 720,
+      "defaultDepth": 560,
+      "toeKick": 100
+    },
+    "wall": {
+      "defaultHeight": 720,
+      "defaultDepth": 320
+    }
+  },
+
+  "formulas": {
+    "shelves": "ceil(height / 600) - 1",
+    "hinges": "ceil(height / 700)"
+  }
+}

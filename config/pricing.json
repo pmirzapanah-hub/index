@@ -1,0 +1,12 @@
+{
+  "labour": {
+    "cuttingPerSheet": 25,
+    "assemblyPerCabinet": 40,
+    "installationPerCabinet": 60
+  },
+  "margin": {
+    "materialMarkup": 1.25,
+    "labourMarkup": 1.4
+  },
+  "minimumCharge": 150
+}

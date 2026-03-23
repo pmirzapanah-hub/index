@@ -1,0 +1,24 @@
+{
+  "board": [
+    {
+      "id": "melamine_white_16",
+      "name": "White Melamine 16mm",
+      "thickness": 16,
+      "sheetSize": [2400, 1200],
+      "costPerSheet": 85,
+      "wasteFactor": 0.12
+    }
+  ],
+  "hardware": [
+    {
+      "id": "hinge_soft_close",
+      "name": "Soft Close Hinge",
+      "cost": 4.5
+    },
+    {
+      "id": "drawer_runner",
+      "name": "Drawer Runner",
+      "cost": 18
+    }
+  ]
+}
