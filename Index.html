@@ -1,0 +1,31 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Cabinet Estimator</title>
+</head>
+<body>
+
+<h2>Cabinet Estimator</h2>
+
+<button onclick="runEstimate()">Estimate</button>
+
+<pre id="output"></pre>
+
+<script type="module">
+import { estimateCabinet } from './src/estimator.js';
+
+window.runEstimate = async function() {
+  const result = await estimateCabinet({
+    type: "base",
+    width: 900,
+    height: 720,
+    depth: 560
+  });
+
+  document.getElementById('output').textContent =
+    JSON.stringify(result, null, 2);
+};
+</script>
+
+</body>
+</html>
