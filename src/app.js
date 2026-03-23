@@ -34,7 +34,8 @@ async function handleEstimate() {
     renderResult(result);
   } catch (err) {
     console.error(err);
-    outputEl.textContent = "Error calculating estimate.";
+    outputEl.innerHTML = `<div class="error">Error calculating estimate: ${err.message}</div>`;
+    outputEl.classList.add('visible');
   }
 }
 
@@ -50,7 +51,32 @@ function getInputValues() {
 
 // --- Render Output ---
 function renderResult(result) {
-  outputEl.textContent = JSON.stringify(result, null, 2);
+  const el = outputEl;
+  const fmt = (n) => `$${n.toFixed(2)} AUD`;
+  const b = result.breakdown;
+
+  el.innerHTML = `
+    <h2>Estimate Summary</h2>
+    <div class="breakdown">
+      <div class="breakdown-row section-header"><span>Materials</span></div>
+      <div class="breakdown-row"><span>Board (${result.sheetsNeeded} sheet${result.sheetsNeeded !== 1 ? 's' : ''})</span><span>${fmt(b.boardCost)}</span></div>
+      <div class="breakdown-row"><span>Hardware (${result.hinges} hinges)</span><span>${fmt(b.hardwareCost)}</span></div>
+
+      <div class="breakdown-row section-header"><span>Labour</span></div>
+      <div class="breakdown-row"><span>Cutting / Machining</span><span>${fmt(b.cuttingCost)}</span></div>
+      <div class="breakdown-row"><span>Assembly</span><span>${fmt(b.assemblyCost)}</span></div>
+      <div class="breakdown-row"><span>Installation</span><span>${fmt(b.installationCost)}</span></div>
+
+      <div class="breakdown-row section-header"><span>Subtotals (with markup)</span></div>
+      <div class="breakdown-row"><span>Materials subtotal</span><span>${fmt(b.materialTotal)}</span></div>
+      <div class="breakdown-row"><span>Labour subtotal</span><span>${fmt(b.labourTotal)}</span></div>
+    </div>
+    <div class="total-row">
+      <span>Total Estimate</span>
+      <span>${fmt(result.total)}</span>
+    </div>
+  `;
+  el.classList.add('visible');
 }
 
 // --- Start App ---

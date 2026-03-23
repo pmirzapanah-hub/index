@@ -65,10 +65,9 @@ export async function estimateCabinet(input) {
   const hingeUnit    = materials.hardware.find(h => h.id === 'hinge_soft_close');
   const hardwareCost = hinges * (hingeUnit ? hingeUnit.cost : 0);
 
-  // --- Labour cost ---
-  const labourCost =
-    pricing.labour.assemblyPerCabinet +
-    pricing.labour.installationPerCabinet;
+  const assemblyCost     = pricing.labour.assemblyPerCabinet;
+  const installationCost = pricing.labour.installationPerCabinet;
+  const labourCost       = assemblyCost + installationCost;
 
   // --- Totals with markups ---
   const materialTotal = (boardCost + hardwareCost) * pricing.margin.materialMarkup;
@@ -82,12 +81,13 @@ export async function estimateCabinet(input) {
     hinges,
     sheetsNeeded,
     breakdown: {
-      boardCost:    +boardCost.toFixed(2),
-      hardwareCost: +hardwareCost.toFixed(2),
-      cuttingCost:  +cuttingCost.toFixed(2),
-      labourCost:   +labourCost.toFixed(2),
-      materialTotal: +materialTotal.toFixed(2),
-      labourTotal:   +labourTotal.toFixed(2)
+      boardCost:        +boardCost.toFixed(2),
+      hardwareCost:     +hardwareCost.toFixed(2),
+      cuttingCost:      +cuttingCost.toFixed(2),
+      assemblyCost:     +assemblyCost.toFixed(2),
+      installationCost: +installationCost.toFixed(2),
+      materialTotal:    +materialTotal.toFixed(2),
+      labourTotal:      +labourTotal.toFixed(2)
     },
     total: +total.toFixed(2)
   };
