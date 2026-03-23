@@ -2,23 +2,53 @@
   "board": [
     {
       "id": "melamine_white_16",
-      "name": "White Melamine 16mm",
+      "name": "White Melamine 16mm (Cabinet Carcass)",
       "thickness": 16,
-      "sheetSize": [2400, 1200],
+      "sheetSize": [2420, 1210],
       "costPerSheet": 85,
-      "wasteFactor": 0.12
+      "wasteFactor": 0.12,
+      "use": "carcass"
     }
   ],
+
+  "doorFace": [
+    {
+      "id": "mdf_16",
+      "name": "MDF 16mm (Door / Drawer Face)",
+      "thickness": 16,
+      "sheetSize": [2420, 1210],
+      "costPerSheet": 120,
+      "wasteFactor": 0.10,
+      "use": "door_drawer"
+    },
+    {
+      "id": "mdf_18",
+      "name": "MDF 18mm (Door / Drawer Face)",
+      "thickness": 18,
+      "sheetSize": [2420, 1210],
+      "costPerSheet": 135,
+      "wasteFactor": 0.10,
+      "use": "door_drawer"
+    }
+  ],
+
   "hardware": [
     {
       "id": "hinge_soft_close",
-      "name": "Soft Close Hinge",
-      "cost": 4.5
+      "name": "Soft Close Hinge (each)",
+      "cost": 4.50
     },
     {
-      "id": "drawer_runner",
-      "name": "Drawer Runner",
-      "cost": 18
+      "id": "drawer_runner_set",
+      "name": "Drawer Runner Set (pair)",
+      "cost": 18.00,
+      "quantityPerDrawer": 1
+    },
+    {
+      "id": "drawer_lock",
+      "name": "Drawer Lock",
+      "cost": 6.00,
+      "quantityPerDrawer": 1
     }
   ]
 }

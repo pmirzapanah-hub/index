@@ -2,11 +2,23 @@
   "labour": {
     "cuttingPerSheet": 25,
     "assemblyPerCabinet": 40,
-    "installationPerCabinet": 60
+    "installationPerCabinet": 60,
+    "paintingPerDoor": 0,
+    "paintingPerDrawerFace": 0
   },
+
   "margin": {
     "materialMarkup": 1.25,
-    "labourMarkup": 1.4
+    "labourMarkup": 1.40,
+    "doorFaceMarkup": 1.30
   },
-  "minimumCharge": 150
+
+  "hardware": {
+    "drawerSetCost": 24.00,
+    "comment": "drawerSetCost = runner set + lock per drawer (matches hardware ids in materials.json)"
+  },
+
+  "minimumCharge": 150,
+
+  "currency": "AUD"
 }

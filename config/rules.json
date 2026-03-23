@@ -1,18 +1,48 @@
 {
   "cabinetTypes": {
     "base": {
+      "label": "Base Cabinet",
       "defaultHeight": 720,
       "defaultDepth": 560,
-      "toeKick": 100
+      "toeKick": 100,
+      "hasToeKick": true,
+      "panels": ["left", "right", "bottom", "back"],
+      "typicalDoors": 1,
+      "typicalDrawers": 0
     },
     "wall": {
+      "label": "Wall Cabinet",
       "defaultHeight": 720,
-      "defaultDepth": 320
+      "defaultDepth": 320,
+      "hasToeKick": false,
+      "panels": ["left", "right", "top", "bottom", "back"],
+      "typicalDoors": 1,
+      "typicalDrawers": 0
+    },
+    "tall": {
+      "label": "Tall Cabinet",
+      "defaultHeight": 2100,
+      "defaultDepth": 560,
+      "toeKick": 100,
+      "hasToeKick": true,
+      "panels": ["left", "right", "top", "bottom", "back"],
+      "typicalDoors": 2,
+      "typicalDrawers": 0
+    },
+    "tower": {
+      "label": "Tower / Pantry",
+      "defaultHeight": 2400,
+      "defaultDepth": 600,
+      "toeKick": 100,
+      "hasToeKick": true,
+      "panels": ["left", "right", "top", "bottom", "back"],
+      "typicalDoors": 2,
+      "typicalDrawers": 2
     }
   },
 
   "formulas": {
     "shelves": "ceil(height / 600) - 1",
-    "hinges": "ceil(height / 700)"
+    "hinges":  "ceil(height / 700)"
   }
 }
