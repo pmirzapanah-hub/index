@@ -1,40 +1,57 @@
-console.log("APP JS LOADED");
-alert("JS is working");
+import { estimateCabinet } from './estimator.js';
 
-import { estimateCabinet } from './srcestimator.js';
+// --- DOM Elements ---
+const outputEl = document.getElementById('output');
+const estimateBtn = document.getElementById('estimateBtn');
 
-document.addEventListener('DOMContentLoaded', init);
+// --- Init App ---
+async function init() {
+  await loadTheme();
+  bindEvents();
+}
 
-function init() {
-  const estimateBtn = document.getElementById('estimateBtn');
+// --- Load Theme (from theme.json) ---
+async function loadTheme() {
+  const res = await fetch('/config/theme.json');
+  const theme = await res.json();
 
-  if (!estimateBtn) {
-    console.error("Button not found");
-    return;
-  }
+  document.body.style.backgroundColor = theme.secondaryColor;
+  document.body.style.color = "#fff";
 
+  document.title = theme.brandName;
+}
+
+// --- Bind UI Events ---
+function bindEvents() {
   estimateBtn.addEventListener('click', handleEstimate);
 }
 
+// --- Handle Estimate ---
 async function handleEstimate() {
-  const outputEl = document.getElementById('output');
-
   try {
-    outputEl.textContent = "Calculating...";
-
-    const input = {
-      type: document.getElementById('type').value,
-      width: Number(document.getElementById('width').value),
-      height: Number(document.getElementById('height').value),
-      depth: Number(document.getElementById('depth').value)
-    };
-
+    const input = getInputValues();
     const result = await estimateCabinet(input);
-
-    outputEl.textContent = JSON.stringify(result, null, 2);
-
+    renderResult(result);
   } catch (err) {
     console.error(err);
-    outputEl.textContent = "Error: " + err.message;
+    outputEl.textContent = "Error calculating estimate.";
   }
 }
+
+// --- Get Input Values from form ---
+function getInputValues() {
+  return {
+    type:   document.getElementById('type').value,
+    width:  parseInt(document.getElementById('width').value, 10),
+    height: parseInt(document.getElementById('height').value, 10),
+    depth:  parseInt(document.getElementById('depth').value, 10)
+  };
+}
+
+// --- Render Output ---
+function renderResult(result) {
+  outputEl.textContent = JSON.stringify(result, null, 2);
+}
+
+// --- Start App ---
+init();
