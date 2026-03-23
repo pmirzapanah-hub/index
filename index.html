@@ -4,8 +4,9 @@
   <meta charset="UTF-8">
   <title>Cabinet Estimator</title>
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-
   <style>
+    *, *::before, *::after { box-sizing: border-box; }
+
     body {
       font-family: Arial, sans-serif;
       margin: 0;
@@ -15,147 +16,222 @@
     }
 
     h1 {
-      margin-bottom: 20px;
+      text-align: center;
+      margin-bottom: 24px;
+      font-size: 22px;
+      color: #fff;
     }
 
-    .container {
-      max-width: 500px;
+    .page {
+      max-width: 700px;
       margin: auto;
+    }
+
+    /* ── Cabinet Cards ── */
+    .cabinet-card {
       background: #2a2a2a;
-      padding: 20px;
       border-radius: 10px;
+      padding: 18px;
+      margin-bottom: 16px;
+      border: 1px solid #333;
+    }
+
+    .card-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 14px;
+    }
+
+    .card-title {
+      font-size: 15px;
+      font-weight: bold;
+      color: #fff;
+    }
+
+    .remove-btn {
+      background: #3a1a1a;
+      color: #ff6b6b;
+      border: none;
+      padding: 4px 10px;
+      border-radius: 5px;
+      cursor: pointer;
+      font-size: 12px;
+    }
+
+    .remove-btn:hover { background: #ff6b6b; color: #fff; }
+
+    /* ── Form Layout ── */
+    .form-row {
+      display: flex;
+      gap: 12px;
+      flex-wrap: wrap;
+      margin-bottom: 12px;
     }
 
     .form-group {
-      margin-bottom: 15px;
+      flex: 1;
+      min-width: 120px;
     }
 
     label {
       display: block;
-      margin-bottom: 5px;
-      font-size: 14px;
+      margin-bottom: 4px;
+      font-size: 12px;
+      color: #aaa;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
     }
 
     input, select {
       width: 100%;
-      padding: 8px;
-      border-radius: 5px;
-      border: none;
+      padding: 8px 10px;
+      border-radius: 6px;
+      border: 1px solid #444;
+      background: #1e1e1e;
+      color: #fff;
       font-size: 14px;
-      box-sizing: border-box;
     }
 
-    button {
+    input:focus, select:focus {
+      outline: none;
+      border-color: #2A7FFF;
+    }
+
+    /* ── Buttons ── */
+    .btn-add {
       width: 100%;
       padding: 10px;
+      background: #2a2a2a;
+      border: 2px dashed #444;
+      color: #aaa;
+      font-size: 15px;
+      border-radius: 8px;
+      cursor: pointer;
+      margin-bottom: 16px;
+      transition: all 0.2s;
+    }
+
+    .btn-add:hover { border-color: #2A7FFF; color: #2A7FFF; }
+
+    .btn-estimate {
+      width: 100%;
+      padding: 12px;
       background: #2A7FFF;
       border: none;
       color: white;
       font-size: 16px;
-      border-radius: 5px;
+      border-radius: 8px;
       cursor: pointer;
+      font-weight: bold;
+      margin-bottom: 24px;
     }
 
-    button:hover {
-      opacity: 0.9;
-    }
+    .btn-estimate:hover { opacity: 0.9; }
 
-    .result {
-      margin-top: 20px;
-      display: none;
-    }
-    .result.visible { display: block; }
-    .result h2 {
+    /* ── Results ── */
+    #output { display: none; }
+    #output.visible { display: block; }
+
+    .results-heading {
       font-size: 13px;
-      color: #aaa;
-      margin: 0 0 8px;
+      color: #888;
       text-transform: uppercase;
-      letter-spacing: 0.05em;
+      letter-spacing: 0.06em;
+      margin: 0 0 12px;
     }
-    .breakdown {
-      background: #111;
-      border-radius: 8px 8px 0 0;
+
+    .result-card {
+      margin-bottom: 16px;
+      border-radius: 8px;
       overflow: hidden;
+      border: 1px solid #333;
     }
+
+    .result-card-header {
+      background: #2a2a2a;
+      padding: 10px 14px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      font-size: 14px;
+      font-weight: bold;
+    }
+
+    .result-type {
+      font-size: 11px;
+      color: #888;
+      font-weight: normal;
+    }
+
+    .breakdown { background: #111; }
+
     .breakdown-row {
       display: flex;
       justify-content: space-between;
-      padding: 10px 14px;
-      font-size: 14px;
-      border-bottom: 1px solid #222;
+      padding: 8px 14px;
+      font-size: 13px;
+      border-bottom: 1px solid #1a1a1a;
       color: #ccc;
     }
-    .breakdown-row:last-child { border-bottom: none; }
+
     .breakdown-row.section-header {
       background: #1a1a1a;
-      color: #888;
+      color: #777;
       font-size: 11px;
       text-transform: uppercase;
-      letter-spacing: 0.08em;
-      padding: 6px 14px;
+      letter-spacing: 0.07em;
+      padding: 5px 14px;
     }
+
     .total-row {
       display: flex;
       justify-content: space-between;
-      padding: 14px;
-      font-size: 18px;
+      padding: 12px 14px;
+      font-size: 15px;
       font-weight: bold;
       background: #2A7FFF;
       color: #fff;
-      border-radius: 0 0 8px 8px;
     }
+
+    .grand-total-row {
+      display: flex;
+      justify-content: space-between;
+      padding: 16px 18px;
+      font-size: 20px;
+      font-weight: bold;
+      background: #1a3a6a;
+      color: #fff;
+      border-radius: 8px;
+      margin-top: 8px;
+    }
+
     .error {
       background: #3a1a1a;
       color: #ff6b6b;
       padding: 10px 14px;
       border-radius: 8px;
-      margin-top: 20px;
       font-size: 14px;
     }
   </style>
 </head>
-
 <body>
-
-  <div class="container">
+  <div class="page">
     <h1>Cabinet Estimator</h1>
 
-    <!-- Cabinet Type -->
-    <div class="form-group">
-      <label for="type">Cabinet Type</label>
-      <select id="type">
-        <option value="base">Base Cabinet</option>
-        <option value="wall">Wall Cabinet</option>
-      </select>
-    </div>
+    <!-- Cabinet items will be inserted here -->
+    <div id="itemsContainer"></div>
 
-    <!-- Width -->
-    <div class="form-group">
-      <label for="width">Width (mm)</label>
-      <input type="number" id="width" value="900">
-    </div>
+    <!-- Add item -->
+    <button class="btn-add" id="addItemBtn">+ Add Cabinet</button>
 
-    <!-- Height -->
-    <div class="form-group">
-      <label for="height">Height (mm)</label>
-      <input type="number" id="height" value="720">
-    </div>
+    <!-- Calculate -->
+    <button class="btn-estimate" id="estimateBtn">Calculate Estimate</button>
 
-    <!-- Depth -->
-    <div class="form-group">
-      <label for="depth">Depth (mm)</label>
-      <input type="number" id="depth" value="560">
-    </div>
-
-    <!-- Estimate Button -->
-    <button id="estimateBtn">Calculate Estimate</button>
-
-    <!-- Output -->
-    <div id="output" class="result"></div>
+    <!-- Results -->
+    <div id="output"></div>
   </div>
 
-  <!-- App Script — path matches your actual src/app.js location -->
   <script type="module" src="./src/app.js"></script>
-
 </body>
 </html>
