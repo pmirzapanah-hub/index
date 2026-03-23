@@ -19,13 +19,9 @@
       text-align: center;
       margin-bottom: 24px;
       font-size: 22px;
-      color: #fff;
     }
 
-    .page {
-      max-width: 700px;
-      margin: auto;
-    }
+    .page { max-width: 700px; margin: auto; }
 
     /* ── Cabinet Cards ── */
     .cabinet-card {
@@ -43,11 +39,7 @@
       margin-bottom: 14px;
     }
 
-    .card-title {
-      font-size: 15px;
-      font-weight: bold;
-      color: #fff;
-    }
+    .card-title { font-size: 15px; font-weight: bold; }
 
     .remove-btn {
       background: #3a1a1a;
@@ -58,21 +50,17 @@
       cursor: pointer;
       font-size: 12px;
     }
-
     .remove-btn:hover { background: #ff6b6b; color: #fff; }
 
-    /* ── Form Layout ── */
+    /* ── Forms ── */
     .form-row {
       display: flex;
       gap: 12px;
       flex-wrap: wrap;
-      margin-bottom: 12px;
+      margin-bottom: 10px;
     }
 
-    .form-group {
-      flex: 1;
-      min-width: 120px;
-    }
+    .form-group { flex: 1; min-width: 120px; }
 
     label {
       display: block;
@@ -83,7 +71,9 @@
       letter-spacing: 0.04em;
     }
 
-    input, select {
+    input[type="number"],
+    input[type="text"],
+    select {
       width: 100%;
       padding: 8px 10px;
       border-radius: 6px;
@@ -98,6 +88,91 @@
       border-color: #2A7FFF;
     }
 
+    /* ── Section label ── */
+    .section-label {
+      font-size: 11px;
+      color: #888;
+      text-transform: uppercase;
+      letter-spacing: 0.07em;
+      margin-bottom: 8px;
+    }
+
+    /* ── Checkboxes ── */
+    .checkbox-row { align-items: center; gap: 20px; }
+
+    .check-label {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 13px;
+      color: #ccc;
+      cursor: pointer;
+      text-transform: none;
+      letter-spacing: 0;
+    }
+
+    .check-label input[type="checkbox"] {
+      width: 16px;
+      height: 16px;
+      cursor: pointer;
+      accent-color: #2A7FFF;
+    }
+
+    /* ── Gap info ── */
+    .gap-info {
+      margin-bottom: 10px;
+      border-radius: 6px;
+      overflow: hidden;
+    }
+
+    .gap-warning {
+      background: #3a2a10;
+      color: #ffb74d;
+      padding: 8px 12px;
+      font-size: 13px;
+      border-bottom: 1px solid #4a3a20;
+    }
+
+    .gap-note {
+      background: #1a2a3a;
+      color: #64b5f6;
+      padding: 8px 12px;
+      font-size: 13px;
+    }
+
+    /* ── Appliance section ── */
+    .appliance-section {
+      background: #222;
+      border: 1px solid #3a3a3a;
+      border-radius: 8px;
+      padding: 12px;
+      margin-bottom: 10px;
+    }
+
+    .appliance-grid {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      margin-bottom: 10px;
+    }
+
+    .appl-check {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 13px;
+      color: #ccc;
+      cursor: pointer;
+    }
+
+    .appl-check input[type="checkbox"] {
+      accent-color: #2A7FFF;
+      width: 15px;
+      height: 15px;
+    }
+
+    .appl-width-row { margin-top: 4px; }
+
     /* ── Buttons ── */
     .btn-add {
       width: 100%;
@@ -108,10 +183,9 @@
       font-size: 15px;
       border-radius: 8px;
       cursor: pointer;
-      margin-bottom: 16px;
+      margin-bottom: 12px;
       transition: all 0.2s;
     }
-
     .btn-add:hover { border-color: #2A7FFF; color: #2A7FFF; }
 
     .btn-estimate {
@@ -126,7 +200,6 @@
       font-weight: bold;
       margin-bottom: 24px;
     }
-
     .btn-estimate:hover { opacity: 0.9; }
 
     /* ── Results ── */
@@ -158,10 +231,14 @@
       font-weight: bold;
     }
 
-    .result-type {
-      font-size: 11px;
-      color: #888;
-      font-weight: normal;
+    .result-type { font-size: 11px; color: #888; font-weight: normal; }
+
+    .result-warning {
+      background: #3a2a10;
+      color: #ffb74d;
+      padding: 7px 14px;
+      font-size: 12px;
+      border-bottom: 1px solid #4a3a20;
     }
 
     .breakdown { background: #111; }
@@ -218,20 +295,11 @@
 <body>
   <div class="page">
     <h1>Cabinet Estimator</h1>
-
-    <!-- Cabinet items will be inserted here -->
     <div id="itemsContainer"></div>
-
-    <!-- Add item -->
     <button class="btn-add" id="addItemBtn">+ Add Cabinet</button>
-
-    <!-- Calculate -->
     <button class="btn-estimate" id="estimateBtn">Calculate Estimate</button>
-
-    <!-- Results -->
     <div id="output"></div>
   </div>
-
   <script type="module" src="./src/app.js"></script>
 </body>
 </html>
