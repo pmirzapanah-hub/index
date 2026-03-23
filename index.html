@@ -60,12 +60,57 @@
       opacity: 0.9;
     }
 
-    pre {
-      background: #111;
-      padding: 10px;
-      border-radius: 5px;
+    .result {
       margin-top: 20px;
-      overflow-x: auto;
+      display: none;
+    }
+    .result.visible { display: block; }
+    .result h2 {
+      font-size: 13px;
+      color: #aaa;
+      margin: 0 0 8px;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+    .breakdown {
+      background: #111;
+      border-radius: 8px 8px 0 0;
+      overflow: hidden;
+    }
+    .breakdown-row {
+      display: flex;
+      justify-content: space-between;
+      padding: 10px 14px;
+      font-size: 14px;
+      border-bottom: 1px solid #222;
+      color: #ccc;
+    }
+    .breakdown-row:last-child { border-bottom: none; }
+    .breakdown-row.section-header {
+      background: #1a1a1a;
+      color: #888;
+      font-size: 11px;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      padding: 6px 14px;
+    }
+    .total-row {
+      display: flex;
+      justify-content: space-between;
+      padding: 14px;
+      font-size: 18px;
+      font-weight: bold;
+      background: #2A7FFF;
+      color: #fff;
+      border-radius: 0 0 8px 8px;
+    }
+    .error {
+      background: #3a1a1a;
+      color: #ff6b6b;
+      padding: 10px 14px;
+      border-radius: 8px;
+      margin-top: 20px;
+      font-size: 14px;
     }
   </style>
 </head>
@@ -106,7 +151,7 @@
     <button id="estimateBtn">Calculate Estimate</button>
 
     <!-- Output -->
-    <pre id="output">Result will appear here...</pre>
+    <div id="output" class="result"></div>
   </div>
 
   <!-- App Script — path matches your actual src/app.js location -->
