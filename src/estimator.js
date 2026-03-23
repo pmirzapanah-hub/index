@@ -1,8 +1,8 @@
 async function loadConfig() {
   const [materials, pricing, rules] = await Promise.all([
-    fetch('/config/materials.json').then(r => r.json()),
-    fetch('/config/pricing.json').then(r => r.json()),
-    fetch('/config/rules.json').then(r => r.json())
+    fetch('/index/config/materials.json').then(r => r.json()),
+    fetch('/index/config/pricing.json').then(r => r.json()),
+    fetch('/index/config/rules.json').then(r => r.json())
   ]);
 
   return { materials, pricing, rules };

@@ -12,7 +12,7 @@ async function init() {
 
 // --- Load Theme (from theme.json) ---
 async function loadTheme() {
-  const res = await fetch('../config/theme.json');
+  const res = await fetch('/index/config/theme.json');
   const theme = await res.json();
 
   document.body.style.backgroundColor = theme.secondaryColor;
