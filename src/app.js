@@ -1,7 +1,7 @@
 console.log("APP JS LOADED");
 alert("JS is working");
 
-import { estimateCabinet } from './estimator.js';
+import { estimateCabinet } from './srcestimator.js';
 
 document.addEventListener('DOMContentLoaded', init);
 
