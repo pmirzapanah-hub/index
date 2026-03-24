@@ -2,8 +2,7 @@ import { estimateRoom } from './estimator.js';
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
-const MAX_DOOR_WIDTH   = 450;
-const MAX_DRAWER_WIDTH = 900;
+const MAX_DOOR_WIDTH = 450;
 
 const APPLIANCE_DEFAULTS = {
   dishwasher: { label: 'Dishwasher',     defaultWidth: 600 },
@@ -51,18 +50,17 @@ function addItem() {
   const card      = document.createElement('div');
   card.className  = 'cabinet-card';
   card.dataset.id = id;
-
-  card.innerHTML = buildCardHTML(id, itemCount);
+  card.innerHTML  = buildCardHTML(id, itemCount);
   container.appendChild(card);
 
-  // bind live-validation on width/doors/drawers fields
-  ['width','doors','drawers'].forEach(field => {
+  // Live validate when width or doors change
+  ['width', 'doors'].forEach(field => {
     card.querySelector(`[data-field="${field}"]`)
       .addEventListener('input', () => liveValidate(card));
   });
 
   card.querySelector('[data-field="type"]')
-    .addEventListener('change', (e) => applyTypeDefaults(card, e.target.value));
+    .addEventListener('change', e => applyTypeDefaults(card, e.target.value));
 
   updateCardTitles();
 }
@@ -74,7 +72,6 @@ function buildCardHTML(id, num) {
       <button class="remove-btn" onclick="removeItem(${id})">✕ Remove</button>
     </div>
 
-    <!-- Type & Label -->
     <div class="form-row">
       <div class="form-group">
         <label>Cabinet Type</label>
@@ -87,12 +84,11 @@ function buildCardHTML(id, num) {
       </div>
       <div class="form-group">
         <label>Label (optional)</label>
-        <input type="text" class="field" data-field="label" placeholder="e.g. Kitchen Left"
-               oninput="updateCardTitles()">
+        <input type="text" class="field" data-field="label"
+               placeholder="e.g. Kitchen Left" oninput="updateCardTitles()">
       </div>
     </div>
 
-    <!-- Dimensions -->
     <div class="form-row">
       <div class="form-group">
         <label>Width (mm)</label>
@@ -108,7 +104,6 @@ function buildCardHTML(id, num) {
       </div>
     </div>
 
-    <!-- Counts -->
     <div class="form-row">
       <div class="form-group">
         <label>Shelves</label>
@@ -118,24 +113,25 @@ function buildCardHTML(id, num) {
         <label>Doors</label>
         <input type="number" class="field" data-field="doors" value="1" min="0">
       </div>
-      <div class="form-group">
-        <label>Drawers</label>
-        <input type="number" class="field" data-field="drawers" value="0" min="0">
-      </div>
     </div>
 
-    <!-- Width warning + gap info -->
+    <!-- Drawer Units -->
+    <div class="section-label" style="margin-top:4px">Drawer Units</div>
+    <div class="drawer-units-list" data-section="drawerUnitsList"></div>
+    <button class="btn-add-drawer" onclick="addDrawerUnit(${id})">+ Add Drawer Unit</button>
+
+    <!-- Width summary / gap info -->
     <div class="gap-info" data-section="gapInfo" style="display:none"></div>
 
     <!-- Appliances (shown when gap > 0) -->
     <div class="appliance-section" data-section="applianceSection" style="display:none">
       <div class="section-label">Gap Allocation — Appliances</div>
       <div class="appliance-grid">
-        ${Object.entries(APPLIANCE_DEFAULTS).map(([key, appl]) => `
+        ${Object.entries(APPLIANCE_DEFAULTS).map(([key, a]) => `
           <label class="appl-check">
             <input type="checkbox" data-appl="${key}"
                    onchange="toggleAppliance(this, ${id})">
-            ${appl.label}
+            ${a.label}
           </label>
         `).join('')}
       </div>
@@ -155,7 +151,6 @@ function buildCardHTML(id, num) {
       </label>
     </div>
 
-    <!-- Face material -->
     <div class="form-row" style="margin-top:4px">
       <div class="form-group">
         <label>Door / Drawer / End Board Face Material</label>
@@ -168,59 +163,113 @@ function buildCardHTML(id, num) {
   `;
 }
 
+// ─── Drawer Units ─────────────────────────────────────────────────────────────
+
+window.addDrawerUnit = function(cardId) {
+  const card     = document.querySelector(`.cabinet-card[data-id="${cardId}"]`);
+  const list     = card.querySelector('[data-section="drawerUnitsList"]');
+  const unitId   = Date.now();
+  const unitNum  = list.children.length + 1;
+
+  const row = document.createElement('div');
+  row.className       = 'drawer-unit-row';
+  row.dataset.unitId  = unitId;
+  row.innerHTML = `
+    <div class="drawer-unit-inner">
+      <div class="form-group">
+        <label>Unit ${unitNum} width (mm)</label>
+        <input type="number" class="field" data-unit-field="width"
+               value="600" min="450" max="900"
+               oninput="liveValidate(this.closest('.cabinet-card'))">
+      </div>
+      <div class="form-group">
+        <label>Drawers in this unit</label>
+        <input type="number" class="field" data-unit-field="count"
+               value="3" min="1" max="8">
+      </div>
+      <button class="btn-remove-unit" onclick="removeDrawerUnit(this, '${cardId}')">✕</button>
+    </div>
+  `;
+  list.appendChild(row);
+  liveValidate(card);
+};
+
+window.removeDrawerUnit = function(btn, cardId) {
+  btn.closest('.drawer-unit-row').remove();
+  const card = document.querySelector(`.cabinet-card[data-id="${cardId}"]`);
+  // Re-number unit labels
+  card.querySelectorAll('.drawer-unit-row').forEach((row, i) => {
+    row.querySelector('label').textContent = `Unit ${i + 1} width (mm)`;
+  });
+  liveValidate(card);
+};
+
 // ─── Live Width Validation ────────────────────────────────────────────────────
 
 window.liveValidate = function(card) {
-  const width   = parseInt(card.querySelector('[data-field="width"]').value)   || 0;
-  const doors   = parseInt(card.querySelector('[data-field="doors"]').value)   || 0;
-  const drawers = parseInt(card.querySelector('[data-field="drawers"]').value) || 0;
+  const width = parseInt(card.querySelector('[data-field="width"]').value) || 0;
+  const doors = parseInt(card.querySelector('[data-field="doors"]').value) || 0;
 
-  const usedByDoors   = doors   * MAX_DOOR_WIDTH;
-  const usedByDrawers = drawers * MAX_DRAWER_WIDTH;
+  // Collect drawer units
+  const drawerUnits = readDrawerUnits(card);
+  const usedByDrawers = drawerUnits.reduce((s, u) => s + u.width, 0);
+  const doorWidth     = doors > 0 ? Math.floor(width / doors) : 0;
+  const usedByDoors   = doors * Math.min(doorWidth, MAX_DOOR_WIDTH);
   const usedWidth     = usedByDoors + usedByDrawers;
   const gap           = Math.max(0, width - usedWidth);
+
+  const warnings = [];
+  if (doors > 0 && doorWidth > MAX_DOOR_WIDTH) {
+    warnings.push(`Each door would be ${doorWidth}mm — max is ${MAX_DOOR_WIDTH}mm. Consider adding more doors.`);
+  }
+  drawerUnits.forEach((u, i) => {
+    if (u.width > 900) warnings.push(`Drawer unit ${i + 1} width (${u.width}mm) exceeds 900mm max.`);
+    if (u.width < 450) warnings.push(`Drawer unit ${i + 1} width (${u.width}mm) is below 450mm min.`);
+  });
 
   const gapSection  = card.querySelector('[data-section="gapInfo"]');
   const appSection  = card.querySelector('[data-section="applianceSection"]');
 
-  const warnings = [];
-  if (doors > 0 && doors > 0) {
-    const singleDoorW = Math.floor(width / doors);
-    if (singleDoorW > MAX_DOOR_WIDTH)
-      warnings.push(`Each door would be ${singleDoorW}mm wide — max is ${MAX_DOOR_WIDTH}mm. Consider more doors.`);
-  }
-  if (drawers > 0 && width > MAX_DRAWER_WIDTH)
-    warnings.push(`Cabinet width (${width}mm) exceeds max drawer width of ${MAX_DRAWER_WIDTH}mm.`);
+  // Build summary
+  let html = '';
 
-  if (warnings.length > 0 || gap > 0) {
-    let html = '';
-    warnings.forEach(w => {
-      html += `<div class="gap-warning">⚠️ ${w}</div>`;
-    });
-    if (gap > 0) {
-      html += `<div class="gap-note">📐 <strong>${gap}mm gap</strong> remaining after doors/drawers. Assign it below.</div>`;
-    }
-    gapSection.innerHTML  = html;
-    gapSection.style.display = 'block';
-    appSection.style.display = gap > 0 ? 'block' : 'none';
-  } else {
-    gapSection.style.display  = 'none';
-    appSection.style.display  = 'none';
+  // Width breakdown summary
+  const parts = [];
+  if (doors > 0)           parts.push(`${doors} door${doors > 1 ? 's' : ''} × ${Math.min(doorWidth, MAX_DOOR_WIDTH)}mm = ${usedByDoors}mm`);
+  if (drawerUnits.length)  parts.push(`${drawerUnits.length} drawer unit${drawerUnits.length > 1 ? 's' : ''} = ${usedByDrawers}mm`);
+  if (parts.length) {
+    html += `<div class="gap-note">📐 Used: ${parts.join(' + ')} = <strong>${usedWidth}mm</strong> of ${width}mm`;
+    if (gap > 0) html += ` — <span style="color:#ffb74d"><strong>${gap}mm gap</strong></span>`;
+    else         html += ` — <span style="color:#81c784">✓ full width covered</span>`;
+    html += `</div>`;
   }
+
+  warnings.forEach(w => {
+    html += `<div class="gap-warning">⚠️ ${w}</div>`;
+  });
+
+  if (html) {
+    gapSection.innerHTML     = html;
+    gapSection.style.display = 'block';
+  } else {
+    gapSection.style.display = 'none';
+  }
+
+  appSection.style.display = gap > 0 ? 'block' : 'none';
 };
 
 // ─── Appliance Toggle ─────────────────────────────────────────────────────────
 
 window.toggleAppliance = function(checkbox, cardId) {
-  const card         = document.querySelector(`.cabinet-card[data-id="${cardId}"]`);
-  const widthsDiv    = card.querySelector('[data-section="applianceWidths"]');
-  const type         = checkbox.dataset.appl;
-  const appl         = APPLIANCE_DEFAULTS[type];
-  const existingRow  = widthsDiv.querySelector(`[data-appl-row="${type}"]`);
+  const card        = document.querySelector(`.cabinet-card[data-id="${cardId}"]`);
+  const widthsDiv   = card.querySelector('[data-section="applianceWidths"]');
+  const type        = checkbox.dataset.appl;
+  const appl        = APPLIANCE_DEFAULTS[type];
+  const existingRow = widthsDiv.querySelector(`[data-appl-row="${type}"]`);
 
   if (checkbox.checked) {
     const row = document.createElement('div');
-    row.className = 'appl-width-row form-row';
+    row.className       = 'form-row appl-width-row';
     row.dataset.applRow = type;
     row.innerHTML = `
       <div class="form-group">
@@ -239,46 +288,49 @@ window.toggleAppliance = function(checkbox, cardId) {
 
 window.applyTypeDefaults = function(card, type) {
   const defaults = {
-    base:  { height: 720,  depth: 560, doors: 1, drawers: 0 },
-    wall:  { height: 720,  depth: 320, doors: 1, drawers: 0 },
-    tall:  { height: 2100, depth: 560, doors: 2, drawers: 0 },
-    tower: { height: 2400, depth: 600, doors: 2, drawers: 2 }
+    base:  { height: 720,  depth: 560, doors: 1 },
+    wall:  { height: 720,  depth: 320, doors: 1 },
+    tall:  { height: 2100, depth: 560, doors: 2 },
+    tower: { height: 2400, depth: 600, doors: 2 }
   };
   const d = defaults[type] || {};
   if (d.height !== undefined) card.querySelector('[data-field="height"]').value = d.height;
   if (d.depth  !== undefined) card.querySelector('[data-field="depth"]').value  = d.depth;
   if (d.doors  !== undefined) card.querySelector('[data-field="doors"]').value  = d.doors;
-  if (d.drawers!== undefined) card.querySelector('[data-field="drawers"]').value= d.drawers;
   liveValidate(card);
 };
 
-// ─── Remove Item ──────────────────────────────────────────────────────────────
+// ─── Remove Cabinet ───────────────────────────────────────────────────────────
 
 window.removeItem = function(id) {
-  const card = document.querySelector(`.cabinet-card[data-id="${id}"]`);
-  if (card) card.remove();
+  document.querySelector(`.cabinet-card[data-id="${id}"]`)?.remove();
   updateCardTitles();
 };
 
 function updateCardTitles() {
   document.querySelectorAll('.cabinet-card').forEach((card, i) => {
-    const titleEl = card.querySelector('.card-title');
-    const label   = card.querySelector('[data-field="label"]')?.value?.trim();
-    titleEl.textContent = label || `Cabinet ${i + 1}`;
+    const label = card.querySelector('[data-field="label"]')?.value?.trim();
+    card.querySelector('.card-title').textContent = label || `Cabinet ${i + 1}`;
   });
 }
 
-// ─── Read All Items ───────────────────────────────────────────────────────────
+// ─── Read Helpers ─────────────────────────────────────────────────────────────
+
+function readDrawerUnits(card) {
+  return Array.from(card.querySelectorAll('.drawer-unit-row')).map(row => ({
+    width: parseInt(row.querySelector('[data-unit-field="width"]')?.value) || 600,
+    count: parseInt(row.querySelector('[data-unit-field="count"]')?.value) || 1
+  }));
+}
 
 function readItems() {
   return Array.from(document.querySelectorAll('.cabinet-card')).map(card => {
     const get     = f => card.querySelector(`[data-field="${f}"]`)?.value;
     const checked = f => card.querySelector(`[data-field="${f}"]`)?.checked || false;
 
-    // Collect checked appliances + their widths
     const appliances = [];
     card.querySelectorAll('[data-appl]:checked').forEach(cb => {
-      const type = cb.dataset.appl;
+      const type       = cb.dataset.appl;
       const widthInput = card.querySelector(`[data-appl-width="${type}"]`);
       appliances.push({
         type,
@@ -294,7 +346,7 @@ function readItems() {
       depth:         parseInt(get('depth'),   10),
       shelves:       parseInt(get('shelves'), 10),
       doors:         parseInt(get('doors'),   10),
-      drawers:       parseInt(get('drawers'), 10),
+      drawerUnits:   readDrawerUnits(card),
       faceMaterial:  get('faceMaterial'),
       endBoardLeft:  checked('endBoardLeft'),
       endBoardRight: checked('endBoardRight'),
@@ -309,10 +361,8 @@ async function handleEstimate() {
   const outputEl = document.getElementById('output');
   outputEl.innerHTML = '<p style="color:#aaa;padding:10px">Calculating...</p>';
   outputEl.classList.add('visible');
-
   try {
-    const inputItems = readItems();
-    const result     = await estimateRoom(inputItems);
+    const result = await estimateRoom(readItems());
     renderResult(result);
   } catch (err) {
     console.error(err);
@@ -333,20 +383,26 @@ function renderResult(result) {
       ? item.warnings.map(w => `<div class="result-warning">⚠️ ${w}</div>`).join('')
       : '';
 
-    const appliancesHTML = item.appliances?.length
-      ? `<div class="breakdown-row section-header"><span>Gap / Appliances</span></div>` +
-        item.appliances.map(a =>
-          `<div class="breakdown-row"><span>${APPLIANCE_DEFAULTS[a.type]?.label || a.type} (${a.width}mm)</span><span>gap only</span></div>`
+    const drawerUnitsHTML = item.drawerUnits?.length
+      ? item.drawerUnits.map((u, j) =>
+          `<div class="breakdown-row">
+            <span>Drawer unit ${j + 1} — ${u.width}mm wide, ${u.count} drawer${u.count > 1 ? 's' : ''}</span>
+            <span>${u.count} × runner set</span>
+          </div>`
         ).join('')
       : '';
 
-    const endBoardHTML = item.endBoardCount > 0
-      ? `<div class="breakdown-row"><span>End boards (${item.endBoardCount})</span><span>included in face cost</span></div>`
+    const appliancesHTML = item.appliances?.length
+      ? `<div class="breakdown-row section-header"><span>Gap / Appliances</span></div>` +
+        item.appliances.map(a =>
+          `<div class="breakdown-row">
+            <span>${APPLIANCE_DEFAULTS[a.type]?.label || a.type} (${a.width}mm)</span>
+            <span>gap only</span>
+          </div>`
+        ).join('')
       : '';
 
-    const appFaceHTML = item.applianceFaceCount > 0
-      ? `<div class="breakdown-row"><span>Appliance reveal panels (${item.applianceFaceCount})</span><span>included in face cost</span></div>`
-      : '';
+    const hasFaces = item.doors > 0 || item.totalDrawers > 0 || item.endBoardCount > 0 || item.applianceFaceCount > 0;
 
     return `
       <div class="result-card">
@@ -361,18 +417,27 @@ function renderResult(result) {
           <div class="breakdown-row section-header"><span>Carcass — ${item.carcassSheets} sheet${item.carcassSheets !== 1 ? 's' : ''}</span></div>
           <div class="breakdown-row"><span>Board cost</span><span>${fmt(b.carcassBoardCost)}</span></div>
 
-          ${(item.doors > 0 || item.drawers > 0 || item.endBoardCount > 0 || item.applianceFaceCount > 0) ? `
+          ${hasFaces ? `
           <div class="breakdown-row section-header"><span>Face Boards — ${item.faceMaterial} (${item.faceSheets} sheet${item.faceSheets !== 1 ? 's' : ''})</span></div>
           <div class="breakdown-row"><span>Face board cost</span><span>${fmt(b.faceBoardCost)}</span></div>
-          ${endBoardHTML}
-          ${appFaceHTML}
+          ${item.endBoardCount > 0 ? `<div class="breakdown-row"><span>End boards (${item.endBoardCount})</span><span>included above</span></div>` : ''}
+          ${item.applianceFaceCount > 0 ? `<div class="breakdown-row"><span>Appliance reveal panels (${item.applianceFaceCount})</span><span>included above</span></div>` : ''}
+          ` : ''}
+
+          ${item.drawerUnits?.length ? `
+          <div class="breakdown-row section-header"><span>Drawer Units</span></div>
+          ${drawerUnitsHTML}
           ` : ''}
 
           ${appliancesHTML}
 
           <div class="breakdown-row section-header"><span>Hardware</span></div>
-          ${item.doors   > 0 ? `<div class="breakdown-row"><span>Hinges (${item.doors} door${item.doors > 1 ? 's' : ''} × 2)</span><span>${fmt(b.hingeCost)}</span></div>` : ''}
-          ${item.drawers > 0 ? `<div class="breakdown-row"><span>Drawer sets (${item.drawers})</span><span>${fmt(b.drawerHwCost)}</span></div>` : ''}
+          ${item.doors > 0
+            ? `<div class="breakdown-row"><span>Hinges (${item.doors} door${item.doors > 1 ? 's' : ''} × 2)</span><span>${fmt(b.hingeCost)}</span></div>`
+            : ''}
+          ${item.totalDrawers > 0
+            ? `<div class="breakdown-row"><span>Drawer hardware (${item.totalDrawers} drawers)</span><span>${fmt(b.drawerHwCost)}</span></div>`
+            : ''}
 
           <div class="breakdown-row section-header"><span>Labour</span></div>
           <div class="breakdown-row"><span>Cutting / Machining</span><span>${fmt(b.cuttingCost)}</span></div>
@@ -381,8 +446,8 @@ function renderResult(result) {
 
           <div class="breakdown-row section-header"><span>Subtotals (with markup)</span></div>
           <div class="breakdown-row"><span>Materials</span><span>${fmt(b.materialTotal)}</span></div>
-          ${b.faceTotal    > 0 ? `<div class="breakdown-row"><span>Face material</span><span>${fmt(b.faceTotal)}</span></div>` : ''}
-          ${b.drawerHwTotal> 0 ? `<div class="breakdown-row"><span>Drawer hardware</span><span>${fmt(b.drawerHwTotal)}</span></div>` : ''}
+          ${b.faceTotal     > 0 ? `<div class="breakdown-row"><span>Face material</span><span>${fmt(b.faceTotal)}</span></div>` : ''}
+          ${b.drawerHwTotal > 0 ? `<div class="breakdown-row"><span>Drawer hardware</span><span>${fmt(b.drawerHwTotal)}</span></div>` : ''}
           <div class="breakdown-row"><span>Labour</span><span>${fmt(b.labourTotal)}</span></div>
         </div>
 
@@ -396,7 +461,7 @@ function renderResult(result) {
 
   const grandHTML = result.items.length > 1 ? `
     <div class="grand-total-row">
-      <span>Grand Total — ${result.items.length} cabinets</span>
+      <span>Grand Total — ${result.items.length} cabinet${result.items.length > 1 ? 's' : ''}</span>
       <span>${fmt(result.grandTotal)} AUD</span>
     </div>
   ` : '';

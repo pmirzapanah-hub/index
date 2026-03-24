@@ -31,42 +31,37 @@ function calcSheets(panelAreas, boardSpec, cuttingRate) {
   return { sheetsNeeded, boardCost, cuttingCost };
 }
 
-// ─── Gap / Width Validation ───────────────────────────────────────────────────
+// ─── Width Validation ─────────────────────────────────────────────────────────
 
 /**
- * Work out the used width (doors + drawers) vs total cabinet width.
- * Returns warnings and the leftover gap.
+ * Validate cabinet width against doors and drawer units.
  *
- * Rules:
- *   - Max door width:   450mm  → doors wider than this need splitting
- *   - Max drawer width: 900mm  → drawers wider than this need splitting
+ * input.doors       = number of doors (each ≤ maxDoorWidth)
+ * input.doorWidth   = actual door width (auto = cabinet width / doors, capped at max)
+ * input.drawerUnits = [{ width, count }]  — each unit has width + stacked drawer count
  */
 export function validateWidth(input, limits) {
-  const { width, doors = 0, drawers = 0 } = input;
-  const { maxDoorWidth, maxDrawerWidth } = limits;
+  const { width, doors = 0, drawerUnits = [] } = input;
+  const { maxDoorWidth } = limits;
 
   const warnings = [];
 
-  // Door width check
-  if (doors > 0) {
-    const doorWidth = Math.floor(width / (doors + drawers || 1));
-    if (doorWidth > maxDoorWidth) {
-      warnings.push(`Door width (${doorWidth}mm) exceeds max ${maxDoorWidth}mm. Consider adding more doors or splitting the run.`);
-    }
+  // Door width: evenly split across door count
+  const doorWidth = doors > 0 ? Math.floor(width / doors) : 0;
+  if (doors > 0 && doorWidth > maxDoorWidth) {
+    warnings.push(`Each door would be ${doorWidth}mm — max is ${maxDoorWidth}mm. Consider adding more doors.`);
   }
 
-  // Drawer width check
-  if (drawers > 0 && width > maxDrawerWidth) {
-    warnings.push(`Cabinet width (${width}mm) exceeds max drawer width of ${maxDrawerWidth}mm.`);
-  }
+  // Used width from drawer units
+  const usedByDrawers = drawerUnits.reduce((sum, u) => sum + (u.width || 0), 0);
 
-  // Used width = doors × maxDoorWidth + drawers × maxDrawerWidth (capped at cabinet width)
-  const usedByDoors   = doors   * maxDoorWidth;
-  const usedByDrawers = drawers * maxDrawerWidth;
-  const usedWidth     = usedByDoors + usedByDrawers;
-  const gap           = Math.max(0, width - usedWidth);
+  // Used width from doors (capped at maxDoorWidth each)
+  const usedByDoors = doors * Math.min(doorWidth, maxDoorWidth);
 
-  return { warnings, usedWidth: Math.min(usedWidth, width), gap };
+  const usedWidth = usedByDoors + usedByDrawers;
+  const gap       = Math.max(0, width - usedWidth);
+
+  return { warnings, usedByDoors, usedByDrawers, usedWidth, gap, doorWidth };
 }
 
 // ─── Carcass Panels ───────────────────────────────────────────────────────────
@@ -85,47 +80,43 @@ function carcassPanels(input, cabinetRule) {
 
 // ─── Face Panel Areas ─────────────────────────────────────────────────────────
 
-/**
- * Calculate face panel areas for doors, drawers, end boards, and appliance gaps.
- *
- * End boards: height × depth (same MDF as door/drawer faces).
- * Appliance gap faces: 2 extra faceboards per appliance (left + right reveal panels).
- */
-function facePanelAreas(input, rules) {
+function buildFacePanelAreas(input, rules) {
   const {
     width, height, depth,
-    doors = 0, drawers = 0,
+    doors = 0,
+    drawerUnits = [],
     drawerFaceHeight = 200,
     endBoardLeft  = false,
     endBoardRight = false,
-    appliances = []   // [{ type, width }]
+    appliances    = []
   } = input;
 
-  const { maxDoorWidth, maxDrawerWidth } = rules.limits;
+  const { maxDoorWidth } = rules.limits;
   const areas = [];
 
-  // Door faces — width capped per door
+  // Door faces
   if (doors > 0) {
     const doorW = Math.min(Math.floor(width / doors), maxDoorWidth);
     for (let i = 0; i < doors; i++) areas.push(doorW * height);
   }
 
-  // Drawer faces — full cabinet width, capped
-  if (drawers > 0) {
-    const drawerW = Math.min(width, maxDrawerWidth);
-    for (let i = 0; i < drawers; i++) areas.push(drawerW * drawerFaceHeight);
-  }
+  // Drawer unit faces — each drawer in the unit gets a face panel
+  drawerUnits.forEach(unit => {
+    const drawerW = unit.width || 600;
+    const count   = unit.count || 1;
+    for (let i = 0; i < count; i++) {
+      areas.push(drawerW * drawerFaceHeight);
+    }
+  });
 
-  // End boards — height × depth (side panel, same MDF)
+  // End boards (height × depth, same MDF)
   if (endBoardLeft)  areas.push(height * depth);
   if (endBoardRight) areas.push(height * depth);
 
-  // Appliance extra faceboards
-  // Each appliance with extraFaceboards > 0 adds that many panels (height × depth each)
+  // Appliance reveal panels
   appliances.forEach(appl => {
-    const rule = rules.appliances[appl.type];
-    if (!rule) return;
-    const count = rule.extraFaceboards ?? 0;
+    const rule  = rules.appliances[appl.type];
+    const count = rule?.extraFaceboards ?? 0;
     for (let i = 0; i < count; i++) areas.push(height * depth);
   });
 
@@ -139,22 +130,24 @@ function estimateSingleCabinet(input, materials, pricing, rules) {
   const cabinetRule = rules.cabinetTypes[input.type];
   if (!cabinetRule) throw new Error(`Unknown cabinet type: "${input.type}"`);
 
-  const shelves  = input.shelves  ?? evaluateFormula(rules.formulas.shelves, { height });
-  const doors    = input.doors    ?? cabinetRule.typicalDoors   ?? 0;
-  const drawers  = input.drawers  ?? cabinetRule.typicalDrawers ?? 0;
+  const shelves     = input.shelves ?? evaluateFormula(rules.formulas.shelves, { height });
+  const doors       = input.doors   ?? cabinetRule.typicalDoors ?? 0;
+  const drawerUnits = input.drawerUnits || [];
 
-  // Width validation & gap
-  const { warnings, gap } = validateWidth({ ...input, doors, drawers }, rules.limits);
+  // Total individual drawer count across all units
+  const totalDrawers = drawerUnits.reduce((sum, u) => sum + (u.count || 1), 0);
 
-  // Appliances in the gap
+  // Width validation
+  const { warnings, gap, doorWidth } = validateWidth({ ...input, doors, drawerUnits }, rules.limits);
+
+  // Appliances
   const appliances = input.appliances || [];
   const totalApplianceWidth = appliances.reduce((sum, a) => {
-    const rule = rules.appliances[a.type];
-    return sum + (a.width ?? rule?.defaultWidth ?? 0);
+    return sum + (a.width ?? rules.appliances[a.type]?.defaultWidth ?? 0);
   }, 0);
   const remainingGap = Math.max(0, gap - totalApplianceWidth);
-  if (remainingGap > 0 && appliances.length > 0) {
-    warnings.push(`${remainingGap}mm unaccounted gap after appliances.`);
+  if (remainingGap > 50 && appliances.length > 0) {
+    warnings.push(`${remainingGap}mm unaccounted gap remaining after appliances.`);
   }
 
   // ── Carcass ──
@@ -166,10 +159,10 @@ function estimateSingleCabinet(input, materials, pricing, rules) {
     cuttingCost:  carcassCuttingCost
   } = calcSheets(carcassPanelAreas, carcassBoard, pricing.labour.cuttingPerSheet);
 
-  // ── Face boards (MDF) ──
-  const faceBoardId  = input.faceMaterial || 'mdf_18';
-  const faceBoard    = materials.doorFace.find(b => b.id === faceBoardId) || materials.doorFace[1];
-  const faceAreas    = facePanelAreas({ ...input, doors, drawers, appliances }, rules);
+  // ── Face boards ──
+  const faceBoardId = input.faceMaterial || 'mdf_18';
+  const faceBoard   = materials.doorFace.find(b => b.id === faceBoardId) || materials.doorFace[1];
+  const faceAreas   = buildFacePanelAreas({ ...input, doors, drawerUnits, appliances }, rules);
 
   let faceSheets = 0, faceBoardCost = 0, faceCuttingCost = 0;
   if (faceAreas.length > 0) {
@@ -179,8 +172,8 @@ function estimateSingleCabinet(input, materials, pricing, rules) {
 
   // ── Hardware ──
   const hingeUnit    = materials.hardware.find(h => h.id === 'hinge_soft_close');
-  const hingeCost    = doors   * 2 * (hingeUnit?.cost ?? 0);
-  const drawerHwCost = drawers * pricing.hardware.drawerSetCost;
+  const hingeCost    = doors         * 2 * (hingeUnit?.cost ?? 0);
+  const drawerHwCost = totalDrawers  * pricing.hardware.drawerSetCost;
 
   // ── Labour ──
   const assemblyCost     = pricing.labour.assemblyPerCabinet;
@@ -194,27 +187,21 @@ function estimateSingleCabinet(input, materials, pricing, rules) {
   const labourTotal   = (assemblyCost + installationCost + totalCuttingCost) * pricing.margin.labourMarkup;
   const total         = Math.max(materialTotal + faceTotal + drawerHwTotal + labourTotal, pricing.minimumCharge);
 
-  // ── Extra face count for display ──
-  const endBoardCount    = (input.endBoardLeft ? 1 : 0) + (input.endBoardRight ? 1 : 0);
-  const applianceFaceCount = appliances.reduce((sum, a) => {
-    return sum + (rules.appliances[a.type]?.extraFaceboards ?? 0);
-  }, 0);
+  const endBoardCount      = (input.endBoardLeft ? 1 : 0) + (input.endBoardRight ? 1 : 0);
+  const applianceFaceCount = appliances.reduce((s, a) => s + (rules.appliances[a.type]?.extraFaceboards ?? 0), 0);
 
   return {
     label:             input.label || cabinetRule.label,
     cabinetType:       input.type,
     dimensions:        { width, height, depth },
-    shelves, doors, drawers,
+    shelves, doors, drawerUnits, totalDrawers,
+    doorWidth,
     faceMaterial:      faceBoard.name,
-    carcassSheets,
-    faceSheets,
-    gap,
-    warnings,
-    appliances,
+    carcassSheets, faceSheets,
+    gap, warnings, appliances,
     endBoardLeft:      input.endBoardLeft  || false,
     endBoardRight:     input.endBoardRight || false,
-    endBoardCount,
-    applianceFaceCount,
+    endBoardCount, applianceFaceCount,
     breakdown: {
       carcassBoardCost:  +carcassBoardCost.toFixed(2),
       faceBoardCost:     +faceBoardCost.toFixed(2),
@@ -232,14 +219,12 @@ function estimateSingleCabinet(input, materials, pricing, rules) {
   };
 }
 
-// ─── Public: Single Cabinet ───────────────────────────────────────────────────
+// ─── Public API ───────────────────────────────────────────────────────────────
 
 export async function estimateCabinet(input) {
   const { materials, pricing, rules } = await loadConfig();
   return estimateSingleCabinet(input, materials, pricing, rules);
 }
-
-// ─── Public: Full Room ────────────────────────────────────────────────────────
 
 export async function estimateRoom(items) {
   const { materials, pricing, rules } = await loadConfig();
