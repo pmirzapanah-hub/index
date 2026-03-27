@@ -150,26 +150,30 @@ Respond with ONLY valid JSON — no markdown, no extra text:
 }`;
 }
 
-// ── Anthropic API call ────────────────────────────────────────────────────────
+
+// ── Cloudflare Worker proxy URL ───────────────────────────────────────────────
+// Replace with your actual Worker URL after deploying worker.js
+const WORKER_URL = 'https://cabinet-estimator-proxy.p-mirzapanah.workers.dev';
 
 async function callClaude(messages, maxTokens = 2000) {
-  const response = await fetch('https://api.anthropic.com/v1/messages', {
+  const response = await fetch(WORKER_URL, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
-      model: 'claude-sonnet-4-20250514',
+      model:      'claude-sonnet-4-6',
       max_tokens: maxTokens,
-      system: buildSystemPrompt(),
+      system:     buildSystemPrompt(),
       messages
     })
   });
 
   if (!response.ok) {
     const err = await response.text();
-    throw new Error(`Claude API error ${response.status}: ${err.slice(0, 200)}`);
+    throw new Error(`API error ${response.status}: ${err.slice(0, 200)}`);
   }
 
   const data = await response.json();
+  if (data.error) throw new Error(data.error.message || JSON.stringify(data.error));
   return data.content?.find(b => b.type === 'text')?.text || '';
 }
 
