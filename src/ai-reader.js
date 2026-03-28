@@ -184,12 +184,28 @@ export async function readPlanFile(file, onStatus = () => {}) {
   // ── Stage 1: Description ──────────────────────────────────────────────────
   onStatus('Step 1/3 — Reading plan carefully…');
 
-  // Send as image for both PDF and image files (via pah-proxy, no direct OpenAI upload)
-  const imgMime = isPDF ? 'application/pdf' : mimeType;
-  const fileContent = [
-    { type: 'image_url', image_url: { url: `data:${imgMime};base64,${base64Data}`, detail: 'high' } },
-    { type: 'text', text: buildDescriptionPrompt() }
-  ];
+  // PDFs: send as base64 document. Images: send as image_url.
+  let fileContent;
+  if (isPDF) {
+    fileContent = [
+      {
+        type: 'text',
+        text: buildDescriptionPrompt()
+      },
+      {
+        type: 'image_url',
+        image_url: {
+          url: `data:image/jpeg;base64,${base64Data}`,
+          detail: 'high'
+        }
+      }
+    ];
+  } else {
+    fileContent = [
+      { type: 'image_url', image_url: { url: `data:${mimeType};base64,${base64Data}`, detail: 'high' } },
+      { type: 'text', text: buildDescriptionPrompt() }
+    ];
+  }
 
   const description = await callGPT([{
     role: 'system', content: buildSystemPrompt()
