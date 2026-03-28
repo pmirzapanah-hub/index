@@ -188,11 +188,37 @@ export async function readPlanFile(file, onStatus = () => {}) {
   const extractText = await callClaude([{
     role: 'user',
     content: [{ type: 'text', text: buildExtractionPrompt(description) }]
-  }], 2000);
+  }], 4000);
 
+  // Extract and clean JSON from Claude's response
   const jsonMatch = extractText.match(/\{[\s\S]*\}/);
   if (!jsonMatch) throw new Error('Could not extract structured data from plan.');
-  const extracted = JSON.parse(jsonMatch[0]);
+
+  let extracted;
+  try {
+    extracted = JSON.parse(jsonMatch[0]);
+  } catch (parseErr) {
+    // Try to fix common JSON issues: trailing commas, truncated arrays
+    let cleaned = jsonMatch[0]
+      .replace(/,\s*([}\]])/g, '$1')   // remove trailing commas
+      .replace(/,\s*$/, '')              // remove trailing comma at end
+      .replace(/([^\\])"\s*\n\s*"/g, '$1", "'); // fix missing commas between strings
+
+    // If still broken, try truncating to last valid closing brace
+    try {
+      extracted = JSON.parse(cleaned);
+    } catch (e2) {
+      // Last resort: ask Claude to fix it
+      onStatus('Fixing response format…');
+      const fixText = await callClaude([{
+        role: 'user',
+        content: [{ type: 'text', text: 'The following JSON is malformed. Fix it and return ONLY valid JSON, nothing else:\n\n' + jsonMatch[0].slice(0, 3000) }]
+      }], 1500);
+      const fixMatch = fixText.match(/\{[\s\S]*\}/);
+      if (!fixMatch) throw new Error('Could not parse plan data. Please try again.');
+      extracted = JSON.parse(fixMatch[0]);
+    }
+  }
 
   // ── Stage 3: Take-off ─────────────────────────────────────────────────────
   onStatus('Step 3/3 — Calculating material take-off…');
