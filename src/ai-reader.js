@@ -184,11 +184,12 @@ export async function readPlanFile(file, onStatus = () => {}) {
   // ── Stage 1: Description ──────────────────────────────────────────────────
   onStatus('Step 1/3 — Reading plan carefully…');
 
-  const fileContent = isPDF
-    ? [{ type: 'text', text: buildDescriptionPrompt() },
-       { type: 'file', file: { file_id: await uploadPDF(base64Data) } }]
-    : [{ type: 'image_url', image_url: { url: `data:${mimeType};base64,${base64Data}`, detail: 'high' } },
-       { type: 'text', text: buildDescriptionPrompt() }];
+  // Send as image for both PDF and image files (via pah-proxy, no direct OpenAI upload)
+  const imgMime = isPDF ? 'application/pdf' : mimeType;
+  const fileContent = [
+    { type: 'image_url', image_url: { url: `data:${imgMime};base64,${base64Data}`, detail: 'high' } },
+    { type: 'text', text: buildDescriptionPrompt() }
+  ];
 
   const description = await callGPT([{
     role: 'system', content: buildSystemPrompt()
@@ -221,26 +222,6 @@ export async function readPlanFile(file, onStatus = () => {}) {
   if (warnings.length) extracted.notes = [extracted.notes, ...warnings].filter(Boolean).join(' ');
 
   return { description, extracted, takeoff };
-}
-
-// ── Upload PDF to OpenAI Files API ────────────────────────────────────────────
-async function uploadPDF(base64Data) {
-  const apiKey = getApiKey();
-  const ba  = atob(base64Data);
-  const arr = new Uint8Array(ba.length);
-  for (let i = 0; i < ba.length; i++) arr[i] = ba.charCodeAt(i);
-
-  const fd = new FormData();
-  fd.append('file', new Blob([arr], { type: 'application/pdf' }), 'plan.pdf');
-  fd.append('purpose', 'vision');
-
-  const r = await fetch('https://api.openai.com/v1/files', {
-    method: 'POST',
-    headers: { 'Authorization': 'Bearer ' + apiKey },
-    body: fd
-  });
-  if (!r.ok) throw new Error('PDF upload failed: ' + (await r.text()).slice(0, 150));
-  return (await r.json()).id;
 }
 
 // ── Take-off calculator ───────────────────────────────────────────────────────
