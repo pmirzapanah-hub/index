@@ -152,13 +152,28 @@ Respond with ONLY valid JSON — no markdown, no extra text:
 
 
 // ── Cloudflare Worker proxy URL ───────────────────────────────────────────────
-// Replace with your actual Worker URL after deploying worker.js
 const WORKER_URL = 'https://cabinet-estimator-proxy.p-mirzapanah.workers.dev';
 
+// ── API key — cached in sessionStorage (same pattern as pah-proxy) ────────────
+function getApiKey() {
+  let key = sessionStorage.getItem('cab_anthropic_key');
+  if (!key) {
+    key = prompt('Enter your Anthropic API key (sk-ant-...):');
+    if (!key) throw new Error('API key required.');
+    sessionStorage.setItem('cab_anthropic_key', key.trim());
+  }
+  return key.trim();
+}
+
 async function callClaude(messages, maxTokens = 2000) {
+  const apiKey = getApiKey();
+
   const response = await fetch(WORKER_URL, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: {
+      'Content-Type': 'application/json',
+      'x-api-key':    apiKey
+    },
     body: JSON.stringify({
       model:      'claude-sonnet-4-6',
       max_tokens: maxTokens,
@@ -169,11 +184,15 @@ async function callClaude(messages, maxTokens = 2000) {
 
   if (!response.ok) {
     const err = await response.text();
+    if (response.status === 401) sessionStorage.removeItem('cab_anthropic_key');
     throw new Error(`API error ${response.status}: ${err.slice(0, 200)}`);
   }
 
   const data = await response.json();
-  if (data.error) throw new Error(data.error.message || JSON.stringify(data.error));
+  if (data.error) {
+    if (data.error.type === 'authentication_error') sessionStorage.removeItem('cab_anthropic_key');
+    throw new Error(data.error.message || JSON.stringify(data.error));
+  }
   return data.content?.find(b => b.type === 'text')?.text || '';
 }
 
