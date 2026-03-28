@@ -154,25 +154,11 @@ Respond with ONLY valid JSON — no markdown, no extra text:
 // ── Cloudflare Worker proxy URL ───────────────────────────────────────────────
 const WORKER_URL = 'https://cabinet-estimator-proxy.p-mirzapanah.workers.dev';
 
-// ── API key — cached in sessionStorage (same pattern as pah-proxy) ────────────
-function getApiKey() {
-  let key = sessionStorage.getItem('cab_anthropic_key');
-  if (!key) {
-    key = prompt('Enter your Anthropic API key (sk-ant-...):');
-    if (!key) throw new Error('API key required.');
-    sessionStorage.setItem('cab_anthropic_key', key.trim());
-  }
-  return key.trim();
-}
-
 async function callClaude(messages, maxTokens = 2000) {
-  const apiKey = getApiKey();
-
   const response = await fetch(WORKER_URL, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
-      'x-api-key':    apiKey
     },
     body: JSON.stringify({
       model:      'claude-sonnet-4-6',
