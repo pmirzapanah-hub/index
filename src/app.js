@@ -599,30 +599,31 @@ window.hidePrintMenu = function() {
 };
 
 window.printReport = function(type) {
-  hidePrintMenu();
-  const outputEl = document.getElementById('output');
-  if (!outputEl.classList.contains('visible')) {
+  const result = window._lastEstimateResult;
+  if (!result) {
     alert('Please calculate an estimate first.');
     return;
   }
 
-  // Build print content based on type
-  let printContent = '';
   const date = new Date().toLocaleDateString('en-AU', { year:'numeric', month:'long', day:'numeric' });
+  let printContent = '';
 
-  if (type === 'summary') {
-    printContent = buildSummaryReport(date);
-  } else if (type === 'detail') {
-    printContent = buildDetailReport(date);
-  } else if (type === 'materials') {
-    printContent = buildMaterialReport(date);
-  }
+  if (type === 'summary')   printContent = buildSummaryReport(date);
+  else if (type === 'detail')    printContent = buildDetailReport(date);
+  else if (type === 'materials') printContent = buildMaterialReport(date);
 
-  const win = window.open('', '_blank');
-  win.document.write(printContent);
-  win.document.close();
-  win.focus();
-  setTimeout(() => { win.print(); }, 500);
+  // Use iframe to avoid popup blocker
+  const iframe = document.createElement('iframe');
+  iframe.style.cssText = 'position:fixed;top:-9999px;left:-9999px;width:800px;height:600px;';
+  document.body.appendChild(iframe);
+  iframe.contentDocument.open();
+  iframe.contentDocument.write(printContent);
+  iframe.contentDocument.close();
+  setTimeout(() => {
+    iframe.contentWindow.focus();
+    iframe.contentWindow.print();
+    setTimeout(() => document.body.removeChild(iframe), 2000);
+  }, 500);
 };
 
 // ── Shared print styles ───────────────────────────────────────────────────────
