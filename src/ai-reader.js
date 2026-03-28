@@ -18,20 +18,26 @@ function sheetsRequired(totalAreaMm2) {
   return Math.ceil((totalAreaMm2 / EFFECTIVE_AREA) * SHEET.wasteFactor);
 }
 
-// ── API key — prompt once, cache for session ──────────────────────────────────
-function getApiKey() {
-  let key = sessionStorage.getItem('cab_openai_key');
-  if (!key) {
-    key = prompt('Enter your OpenAI API key (sk-...):');
-    if (!key) throw new Error('API key required.');
-    sessionStorage.setItem('cab_openai_key', key.trim());
+// ── API key — loaded from /config.json (never committed to GitHub) ───────────
+let _cachedApiKey = null;
+async function getApiKey() {
+  if (_cachedApiKey) return _cachedApiKey;
+  try {
+    const res  = await fetch('/index/config.json');
+    const data = await res.json();
+    if (!data.openai_key || data.openai_key.startsWith('sk-...')) {
+      throw new Error('OpenAI key not set in config.json');
+    }
+    _cachedApiKey = data.openai_key.trim();
+    return _cachedApiKey;
+  } catch (e) {
+    throw new Error('Could not load API key from config.json: ' + e.message);
   }
-  return key.trim();
 }
 
 // ── OpenAI call via pah-proxy ─────────────────────────────────────────────────
 async function callGPT(messages, maxTokens = 2000) {
-  const apiKey   = getApiKey();
+  const apiKey = await getApiKey();
 
   const response = await fetch(WORKER_URL, {
     method: 'POST',
@@ -49,15 +55,12 @@ async function callGPT(messages, maxTokens = 2000) {
 
   if (!response.ok) {
     const err = await response.text();
-    if (response.status === 401) sessionStorage.removeItem('cab_openai_key');
+
     throw new Error(`API error ${response.status}: ${err.slice(0, 200)}`);
   }
 
   const data = await response.json();
-  if (data.error) {
-    sessionStorage.removeItem('cab_openai_key');
-    throw new Error(data.error.message || JSON.stringify(data.error));
-  }
+  if (data.error) throw new Error(data.error.message || JSON.stringify(data.error));
 
   return data.choices?.[0]?.message?.content || '';
 }
