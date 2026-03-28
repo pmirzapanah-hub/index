@@ -173,34 +173,80 @@ export function readFileAsBase64(file) {
   });
 }
 
+// ── Load PDF.js dynamically ──────────────────────────────────────────────────
+async function loadPdfJs() {
+  if (window.pdfjsLib) return window.pdfjsLib;
+  return new Promise((resolve, reject) => {
+    const script = document.createElement('script');
+    script.src = 'https://mozilla.github.io/pdf.js/build/pdf.mjs';
+    script.type = 'module';
+    script.onerror = () => reject(new Error('Failed to load PDF.js'));
+    document.head.appendChild(script);
+
+    // Use importmap-compatible dynamic import instead
+    import('https://mozilla.github.io/pdf.js/build/pdf.mjs').then(mod => {
+      mod.GlobalWorkerOptions.workerSrc =
+        'https://mozilla.github.io/pdf.js/build/pdf.worker.mjs';
+      window.pdfjsLib = mod;
+      resolve(mod);
+    }).catch(reject);
+  });
+}
+
+// ── Convert PDF to array of PNG base64 strings ────────────────────────────────
+async function pdfToBase64Images(file, onStatus, maxPages = 8) {
+  onStatus('Loading PDF renderer…');
+  const pdfjsLib = await loadPdfJs();
+
+  onStatus('Parsing PDF…');
+  const arrayBuffer = await file.arrayBuffer();
+  const pdf = await pdfjsLib.getDocument({ data: new Uint8Array(arrayBuffer) }).promise;
+  const totalPages = Math.min(pdf.numPages, maxPages);
+  const images = [];
+
+  for (let pageNum = 1; pageNum <= totalPages; pageNum++) {
+    onStatus(`Rendering page ${pageNum} of ${totalPages}…`);
+    const page = await pdf.getPage(pageNum);
+    const scale = 2.0; // high resolution
+    const viewport = page.getViewport({ scale });
+
+    const canvas = document.createElement('canvas');
+    const ctx = canvas.getContext('2d');
+    canvas.width  = viewport.width;
+    canvas.height = viewport.height;
+
+    await page.render({ canvasContext: ctx, viewport }).promise;
+
+    const dataUrl = canvas.toDataURL('image/png');
+    const base64  = dataUrl.replace(/^data:image\/png;base64,/, '');
+    images.push(base64);
+  }
+
+  return images;
+}
+
 // ── Main: read plan from file ─────────────────────────────────────────────────
 export async function readPlanFile(file, onStatus = () => {}) {
   const isPDF    = file.type === 'application/pdf' || file.name.toLowerCase().endsWith('.pdf');
-  const mimeType = isPDF ? 'application/pdf' : (file.type || 'image/jpeg');
+  const mimeType = file.type || 'image/jpeg';
 
   onStatus('Reading file…');
-  const base64Data = await readFileAsBase64(file);
 
-  // ── Stage 1: Description ──────────────────────────────────────────────────
-  onStatus('Step 1/3 — Reading plan carefully…');
-
-  // PDFs: send as base64 document. Images: send as image_url.
   let fileContent;
+
   if (isPDF) {
+    const images = await pdfToBase64Images(file, onStatus);
+    onStatus(`Step 1/3 — Analysing ${images.length} page(s)…`);
     fileContent = [
-      {
-        type: 'text',
-        text: buildDescriptionPrompt()
-      },
-      {
+      { type: 'text', text: buildDescriptionPrompt() },
+      ...images.map(b64 => ({
         type: 'image_url',
-        image_url: {
-          url: `data:image/jpeg;base64,${base64Data}`,
-          detail: 'high'
-        }
-      }
+        image_url: { url: `data:image/png;base64,${b64}`, detail: 'high' }
+      }))
     ];
   } else {
+    const base64Data = await readFileAsBase64(file);
+    onStatus('Step 1/3 — Reading plan carefully…');
     fileContent = [
       { type: 'image_url', image_url: { url: `data:${mimeType};base64,${base64Data}`, detail: 'high' } },
       { type: 'text', text: buildDescriptionPrompt() }
