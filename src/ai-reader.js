@@ -63,53 +63,51 @@ Parts with E1/E4 edging = carcass HMR. Parts with E3 edging = MDF/door panels.`;
 
 // ── Description prompt ────────────────────────────────────────────────────────
 function buildDescriptionPrompt() {
-  return `Study this cabinet plan or cut-list VERY carefully. Write a thorough, exhaustive description.
+  return `You are reading a cabinet plan or Mozaik cut-list. Your job is to COUNT and LIST every item with precision. Do NOT summarise or estimate — read every label on every page.
 
-SCAN SYSTEMATICALLY — left to right, top to bottom, section by section.
+STRICT RULES:
+- Read EVERY page of the document
+- Number each cabinet sequentially: Cabinet 1, Cabinet 2, Cabinet 3...
+- For EACH cabinet state EXACTLY: type, width in mm, number of doors, number of drawers, number of shelves
+- Count doors by counting Door(L) and Door(R) labels — each label = 1 door
+- Count drawers by counting Dwr labels — each label = 1 drawer
+- Count shelves by counting AdjSh labels — each label = 1 shelf
+- NEVER group or estimate — if you see 3 separate Door(L) labels, that is 3 doors
+- If a value is not shown, write "not shown"
 
-For EVERY cabinet unit you see:
-1. State its position (e.g. "left corner base cabinet")
-2. State its type: base / wall (overhead) / tall / vanity / tower
-3. State its exact width in mm as shown
-4. State exactly what it has: door(s), drawer(s), open shelf, appliance gap
-5. If it has a drawer bank — count EACH drawer individually
-6. Count every door separately — do not group
-7. Note any appliance gaps (fridge space, oven, dishwasher) with widths
-8. Note benchtop runs with dimensions if shown
+FORMAT each cabinet exactly like this:
+Cabinet 1: [type] | width: [X]mm | doors: [N] | drawers: [N] | shelves: [N]
+Cabinet 2: [type] | width: [X]mm | doors: [N] | drawers: [N] | shelves: [N]
+... (continue for every cabinet)
 
-If this is a Mozaik cut-list PDF, extract EVERY part row:
-- Part label (e.g. R17C1 Door(L) #1)
-- Width × Length in mm
-- Cabinet reference
-- Edge codes if shown
-
-At the end write a SUMMARY COUNT:
-- Total base cabinets: X
-- Total wall/overhead cabinets: X
-- Total tall cabinets: X
-- Total doors: X
-- Total drawer fronts: X
-- Total adjustable shelves: X
-
-Be exhaustive. Nothing can be missed — this drives a material order.`;
+FINAL TALLY (add these up from your list above — do not estimate):
+TOTAL CABINETS: X
+TOTAL BASE: X
+TOTAL WALL: X
+TOTAL TALL: X
+TOTAL TOWER: X
+TOTAL DOORS: X
+TOTAL DRAWERS: X
+TOTAL SHELVES: X`;
 }
 
 // ── Extraction prompt ─────────────────────────────────────────────────────────
 function buildExtractionPrompt(description) {
-  return `Based on this detailed cabinet plan description, extract structured cabinet data.
+  return `Convert this cabinet list into structured JSON.
 
-DESCRIPTION:
+SOURCE DATA (use the numbered cabinet list AND the FINAL TALLY — the tally is the source of truth):
 ---
 ${description}
 ---
 
-EXTRACTION RULES:
-- Each distinct cabinet type + width = one entry (e.g. three 600mm base cabs = qty:3)
-- drawer_count: total individual drawers in that cabinet
-- has_door: true for base/wall/tall/vanity unless described as open shelf
-- Tall cabinets always have 2 doors (top + bottom)
-- qty = exact count from description summary
-- width_mm: use exact mm, snap to nearest standard if unclear (300/400/450/500/600/750/900/1000/1200)
+STRICT EXTRACTION RULES:
+- Use the FINAL TALLY totals to verify your counts
+- Group cabinets of the SAME type AND same width: e.g. three 600mm base cabinets = one entry with qty:3
+- door_count and drawer_count are PER CABINET (not total)
+- Use exact widths from the list — do not round unless truly unclear
+- If width unclear, snap to nearest: 300/400/450/500/600/750/900/1000/1200mm
+- total_doors_check and total_drawers_check MUST match the FINAL TALLY exactly
+- Do NOT invent cabinets that are not in the list
 
 Respond with ONLY valid JSON — no markdown, no extra text:
 {
@@ -136,9 +134,10 @@ async function callClaude(messages, maxTokens = 2500) {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
-      model:      'claude-sonnet-4-6',
-      max_tokens: maxTokens,
-      system:     buildSystemPrompt(),
+      model:       'claude-sonnet-4-6',
+      max_tokens:  maxTokens,
+      temperature: 0,
+      system:      buildSystemPrompt(),
       messages
     })
   });
