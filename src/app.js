@@ -619,7 +619,9 @@ function renderResult(result) {
   ` : '';
 
   // Store result globally for print reports
-  window._lastEstimateResult = result;
+  // Preserve _aiTakeoff from previous AI read if it exists — it's more accurate for sheet counts
+  const prevAI = window._lastEstimateResult?._aiTakeoff;
+  window._lastEstimateResult = prevAI ? { ...result, _aiTakeoff: prevAI } : result;
 
   outputEl.innerHTML = `
     <h2 class="results-heading">Estimate Results</h2>
