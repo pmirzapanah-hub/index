@@ -198,6 +198,8 @@ function estimateSingleCabinet(input, materials, pricing, rules) {
     doorWidth,
     faceMaterial:      faceBoard.name,
     carcassSheets, faceSheets,
+    _carcassAreaMm2: +carcassPanelAreas.reduce((s, a) => s + a, 0).toFixed(0),
+    _faceAreaMm2:    +faceAreas.reduce((s, a) => s + a, 0).toFixed(0),
     gap, warnings, appliances,
     endBoardLeft:      input.endBoardLeft  || false,
     endBoardRight:     input.endBoardRight || false,
