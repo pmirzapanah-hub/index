@@ -63,32 +63,30 @@ Parts with E1/E4 edging = carcass HMR. Parts with E3 edging = MDF/door panels.`;
 
 // ── Description prompt — cut-list mode ───────────────────────────────────────
 function buildDescriptionPrompt() {
-  return `You are reading a cabinet plan or Mozaik cut-list. Your job is to COUNT and LIST every item with precision. Do NOT summarise or estimate — read every label on every page.
+  return `This document contains drawings AND a Cabinet List table (usually on the second-to-last page titled "Cabinet List").
 
-STRICT RULES:
-- Read EVERY page of the document
-- Number each cabinet sequentially: Cabinet 1, Cabinet 2, Cabinet 3...
-- For EACH cabinet state EXACTLY: type, width in mm, number of doors, number of drawers, number of shelves
-- Count doors by counting Door(L) and Door(R) labels — each label = 1 door
-- Count drawers by counting Dwr labels — each label = 1 drawer
-- Count shelves by counting AdjSh labels — each label = 1 shelf
-- NEVER group or estimate — if you see 3 separate Door(L) labels, that is 3 doors
-- If a value is not shown, write "not shown"
+YOUR TASK: Read ONLY the Cabinet List table. It has columns: ID, Name, Width, Height, Depth, Description, Notes.
 
-FORMAT each cabinet exactly like this:
-Cabinet 1: [type] | width: [X]mm | doors: [N] | drawers: [N] | shelves: [N]
-Cabinet 2: [type] | width: [X]mm | doors: [N] | drawers: [N] | shelves: [N]
-... (continue for every cabinet)
+RULES:
+1. Read every row in the Cabinet List table
+2. EXCLUDE rows where Name contains "Kickboard", "Filler", "Bulkhead", "Edge Filler", "End Panel", "Bar Back", "Dishwasher (PR)" — these are not cabinets
+3. For each cabinet row determine:
+   - type: "base" if Height ~870mm, "wall" if Height ~456-760mm, "tall" if Height >1200mm
+   - doors: count from Description — e.g. "2 Doors" = 2, "1 Door" = 1, "Open" = 0, "Rangehood" = 0
+   - drawers: count from Description — e.g. "3 Drw" = 3, "1 Drw" = 1, "0" if not mentioned
+   - shelves: 0 unless "Shelf" mentioned (Mozaik base/wall cabinets rarely list shelves in cabinet list)
 
-FINAL TALLY (add these up from your list above — do not estimate):
-TOTAL CABINETS: X
+LIST every cabinet exactly like this:
+R1C1: base | W=300 H=870 D=580 | doors=0 drawers=1 shelves=0
+R1C2: base | W=987 H=870 D=580 | doors=1 drawers=0 shelves=0
+(continue for every non-excluded row)
+
+FINAL TALLY:
 TOTAL BASE: X
-TOTAL WALL: X
+TOTAL WALL: X  
 TOTAL TALL: X
-TOTAL TOWER: X
 TOTAL DOORS: X
-TOTAL DRAWERS: X
-TOTAL SHELVES: X`;
+TOTAL DRAWERS: X`;
 }
 
 // ── Description prompt — photo/visual mode ────────────────────────────────────
@@ -178,19 +176,18 @@ Respond with ONLY valid JSON:
 function buildExtractionPrompt(description) {
   return `Convert this cabinet list into structured JSON.
 
-SOURCE DATA (use the numbered cabinet list AND the FINAL TALLY — the tally is the source of truth):
+SOURCE DATA:
 ---
 ${description}
 ---
 
-STRICT EXTRACTION RULES:
-- Use the FINAL TALLY totals to verify your counts
-- Group cabinets of the SAME type AND same width: e.g. three 600mm base cabinets = one entry with qty:3
-- door_count and drawer_count are PER CABINET (not total)
-- Use exact widths from the list — do not round unless truly unclear
-- If width unclear, snap to nearest: 300/400/450/500/600/750/900/1000/1200mm
-- total_doors_check and total_drawers_check MUST match the FINAL TALLY exactly
-- Do NOT invent cabinets that are not in the list
+RULES:
+- Each R1Cx entry = one cabinet entry with qty:1
+- Only group if IDENTICAL: same type + same width + same doors + same drawers (e.g. R1C14 and R1C15 are both base 705mm 3 drawers → qty:2)
+- door_count and drawer_count are PER CABINET as listed
+- Use EXACT widths — do not round or change
+- total_doors_check and total_drawers_check must match FINAL TALLY
+- Exclude all kickboards, fillers, bulkheads, end panels from cabinets
 
 Respond with ONLY valid JSON — no markdown, no extra text:
 {
