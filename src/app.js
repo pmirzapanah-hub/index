@@ -77,16 +77,22 @@ window.runAIReader = async function() {
 
     // Store AI result in print-compatible format so reports work immediately
     const t = aiResult.takeoff;
+
+    // Get sheet counts from the rendered takeoff cards (most reliable source)
+    const hmrEl  = document.querySelector('#takeoffGrid .takeoff-card:nth-child(1) .tc-value');
+    const mdfEl  = document.querySelector('#takeoffGrid .takeoff-card:nth-child(2) .tc-value');
+    const hmrVal = hmrEl  ? parseInt(hmrEl.textContent)  : (t.hmrSheets || 0);
+    const mdfVal = mdfEl  ? parseInt(mdfEl.textContent)  : (t.mdfSheets || 0);
+
     window._lastEstimateResult = {
-      items: [],   // no per-cabinet items from AI read — reports use pooled data
+      items: [],
       grandTotal: 0,
       pooled: {
-        carcassSheets: t.hmrSheets,
-        faceSheets:    t.mdfSheets,
-        totalSheets:   t.hmrSheets + t.mdfSheets
+        carcassSheets: hmrVal,
+        faceSheets:    mdfVal,
+        totalSheets:   hmrVal + mdfVal
       },
-      // Flat hardware totals for reports
-      _aiTakeoff: t
+      _aiTakeoff: { ...t, hmrSheets: hmrVal, mdfSheets: mdfVal }
     };
 
   } catch (err) {
