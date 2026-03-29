@@ -73,27 +73,21 @@ window.runAIReader = async function() {
     });
 
     statusEl.textContent = '✅ Plan read successfully!';
-    renderTakeoff(aiResult.takeoff, aiResult.description, aiResult.isPhotoMode);
-
-    // Store AI result in print-compatible format so reports work immediately
+    // Store BEFORE rendering so print reports always have the data
     const t = aiResult.takeoff;
-
-    // Get sheet counts from the rendered takeoff cards (most reliable source)
-    const hmrEl  = document.querySelector('#takeoffGrid .takeoff-card:nth-child(1) .tc-value');
-    const mdfEl  = document.querySelector('#takeoffGrid .takeoff-card:nth-child(2) .tc-value');
-    const hmrVal = hmrEl  ? parseInt(hmrEl.textContent)  : (t.hmrSheets || 0);
-    const mdfVal = mdfEl  ? parseInt(mdfEl.textContent)  : (t.mdfSheets || 0);
-
     window._lastEstimateResult = {
-      items: [],
+      items:      [],
       grandTotal: 0,
       pooled: {
-        carcassSheets: hmrVal,
-        faceSheets:    mdfVal,
-        totalSheets:   hmrVal + mdfVal
+        carcassSheets: t.hmrSheets || 0,
+        faceSheets:    t.mdfSheets || 0,
+        totalSheets:   (t.hmrSheets || 0) + (t.mdfSheets || 0)
       },
-      _aiTakeoff: { ...t, hmrSheets: hmrVal, mdfSheets: mdfVal }
+      _aiTakeoff: t
     };
+    console.log('Stored for print:', window._lastEstimateResult.pooled);
+
+    renderTakeoff(t, aiResult.description, aiResult.isPhotoMode);
 
   } catch (err) {
     console.error(err);
