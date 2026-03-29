@@ -743,12 +743,12 @@ function buildSummaryReport(date) {
 
   // Totals
   const ai = result._aiTakeoff;
-  const totalCarcass = ai?.hmrSheets  || result.pooled?.carcassSheets || result.items.reduce((s, i) => s + i.carcassSheets, 0);
-  const totalFace    = ai?.mdfSheets  || result.pooled?.faceSheets    || result.items.reduce((s, i) => s + i.faceSheets, 0);
-  const totalDoors   = ai?.totalDoors   ?? result.items.reduce((s, i) => s + i.doors, 0);
-  const totalDrawers = ai?.totalDrawers ?? result.items.reduce((s, i) => s + (i.totalDrawers || 0), 0);
-  const totalHinges  = ai?.totalHinges  ?? totalDoors * 2;
-  const totalSlides  = ai?.totalSlides  ?? totalDrawers;
+  const totalCarcass = ai ? ai.hmrSheets  : (result.pooled?.carcassSheets ?? result.items.reduce((s, i) => s + i.carcassSheets, 0));
+  const totalFace    = ai ? ai.mdfSheets  : (result.pooled?.faceSheets    ?? result.items.reduce((s, i) => s + i.faceSheets, 0));
+  const totalDoors   = ai ? ai.totalDoors   : result.items.reduce((s, i) => s + i.doors, 0);
+  const totalDrawers = ai ? ai.totalDrawers : result.items.reduce((s, i) => s + (i.totalDrawers || 0), 0);
+  const totalHinges  = ai ? ai.totalHinges  : totalDoors * 2;
+  const totalSlides  = ai ? ai.totalSlides  : totalDrawers;
 
   return `<!DOCTYPE html><html><head>${printStyles()}<title>Summary Report</title></head><body>
     ${reportHeader('Summary Report', date)}
@@ -853,14 +853,14 @@ function buildMaterialReport(date) {
   if (!result) return '<p>No estimate data.</p>';
 
   const ai = result._aiTakeoff;
-  // Priority: AI takeoff → pooled manual → sum of per-cabinet (never 0 if data exists)
-  const totalCarcass = ai?.hmrSheets  || result.pooled?.carcassSheets || result.items.reduce((s, i) => s + i.carcassSheets, 0);
-  const totalFace    = ai?.mdfSheets  || result.pooled?.faceSheets    || result.items.reduce((s, i) => s + i.faceSheets, 0);
-  const totalDoors   = ai?.totalDoors   ?? result.items.reduce((s, i) => s + i.doors, 0);
-  const totalDrawers = ai?.totalDrawers ?? result.items.reduce((s, i) => s + (i.totalDrawers || 0), 0);
-  const totalHinges  = ai?.totalHinges  ?? totalDoors * 2;
-  const totalSlides  = ai?.totalSlides  ?? totalDrawers;
-  const totalHandles = ai?.totalHandles ?? totalDoors + totalDrawers;
+  // Always use AI takeoff if available — it's the most accurate source
+  const totalCarcass = ai ? ai.hmrSheets  : (result.pooled?.carcassSheets ?? result.items.reduce((s, i) => s + i.carcassSheets, 0));
+  const totalFace    = ai ? ai.mdfSheets  : (result.pooled?.faceSheets    ?? result.items.reduce((s, i) => s + i.faceSheets, 0));
+  const totalDoors   = ai ? ai.totalDoors   : result.items.reduce((s, i) => s + i.doors, 0);
+  const totalDrawers = ai ? ai.totalDrawers : result.items.reduce((s, i) => s + (i.totalDrawers || 0), 0);
+  const totalHinges  = ai ? ai.totalHinges  : totalDoors * 2;
+  const totalSlides  = ai ? ai.totalSlides  : totalDrawers;
+  const totalHandles = ai ? ai.totalHandles : totalDoors + totalDrawers;
 
   const cabinetRows = result.items.length > 0
     ? result.items.map((item, i) => `
