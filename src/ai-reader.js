@@ -61,7 +61,7 @@ Door(L)=left door (MDF 18mm), Door(R)=right door (MDF 18mm), Dwr=drawer front (M
 Parts with E1/E4 edging = carcass HMR. Parts with E3 edging = MDF/door panels.`;
 }
 
-// ── Description prompt ────────────────────────────────────────────────────────
+// ── Description prompt — cut-list mode ───────────────────────────────────────
 function buildDescriptionPrompt() {
   return `You are reading a cabinet plan or Mozaik cut-list. Your job is to COUNT and LIST every item with precision. Do NOT summarise or estimate — read every label on every page.
 
@@ -89,6 +89,89 @@ TOTAL TOWER: X
 TOTAL DOORS: X
 TOTAL DRAWERS: X
 TOTAL SHELVES: X`;
+}
+
+// ── Description prompt — photo/visual mode ────────────────────────────────────
+function buildPhotoPrompt() {
+  return `You are looking at a photo of a kitchen or cabinet installation. Estimate the cabinets you can see.
+
+STEP 1 — DETECT INPUT TYPE:
+First decide: is this a kitchen photo/render, or a technical plan/cut-list?
+- If it is a PHOTO or RENDER: continue with estimation below
+- If it is a PLAN/CUT-LIST: reply with "TYPE:CUTLIST" and stop — do not estimate
+
+STEP 2 — COUNT AND ESTIMATE (photos only):
+Scan the image systematically left to right.
+
+For BASE cabinets (below benchtop):
+- Count each door panel as one door unit
+- Estimate width: single door ≈ 450–600mm, double door ≈ 900mm, drawer bank ≈ 450–600mm
+- Standard base height: 720mm, depth: 560mm
+
+For WALL/OVERHEAD cabinets (above benchtop):
+- Count each door panel
+- Estimate width same as above
+- Standard wall height: 700mm, depth: 320mm
+
+For TALL cabinets / towers (full height):
+- Note any oven towers, pantry units, fridge surrounds
+- Standard tall height: 2100–2400mm
+
+FORMAT each cabinet:
+Cabinet 1: [type] | est. width: [X]mm | doors: [N] | drawers: [N] | confidence: [high/medium/low]
+Cabinet 2: ...
+
+FINAL TALLY:
+TOTAL BASE: X
+TOTAL WALL: X
+TOTAL TALL: X
+TOTAL DOORS: X
+TOTAL DRAWERS: X
+NOTE: [any assumptions made about dimensions or layout]`;
+}
+
+// ── Build extraction from photo description ──────────────────────────────────
+async function buildExtractionFromPhoto(photoDescription, fileBlock) {
+  const prompt = `You analysed a kitchen photo and produced this cabinet list:
+
+${photoDescription}
+
+Now convert this into structured JSON. Use estimated dimensions where exact sizes aren't visible.
+Standard estimates: base width 600mm (single door) or 900mm (double), wall width same, tall 600mm.
+For drawers without stated count, use 3 drawers per drawer bank.
+
+Respond with ONLY valid JSON:
+{
+  "scope": "Kitchen photo — dimensions estimated",
+  "cabinets": {
+    "base":  [{"width_mm": 600, "height_mm": 720, "depth_mm": 560, "qty": 1, "drawer_count": 0, "has_door": true, "door_count": 1, "estimated": true, "note": ""}],
+    "wall":  [{"width_mm": 600, "height_mm": 700, "depth_mm": 320, "qty": 1, "has_door": true, "door_count": 1, "estimated": true, "note": ""}],
+    "tall":  [],
+    "tower": []
+  },
+  "appliances": [],
+  "benchtop_lm": 0,
+  "ceiling_height_mm": 2400,
+  "total_doors_check": 0,
+  "total_drawers_check": 0,
+  "total_shelves_check": 0,
+  "notes": "Dimensions estimated from photo"
+}`;
+
+  const extractText = await callClaude([{
+    role: 'user',
+    content: [{ type: 'text', text: prompt }]
+  }], 2000);
+
+  const jsonMatch = extractText.match(/\{[\s\S]*\}/);
+  if (!jsonMatch) throw new Error('Could not extract cabinet data from photo.');
+
+  try {
+    return JSON.parse(jsonMatch[0]);
+  } catch(e) {
+    const cleaned = jsonMatch[0].replace(/,\s*([}\]])/g, '$1');
+    return JSON.parse(cleaned);
+  }
 }
 
 // ── Extraction prompt ─────────────────────────────────────────────────────────
@@ -175,7 +258,32 @@ export async function readPlanFile(file, onStatus = () => {}) {
     ? { type: 'document', source: { type: 'base64', media_type: 'application/pdf', data: base64Data } }
     : { type: 'image',    source: { type: 'base64', media_type: mimeType,           data: base64Data } };
 
-  // ── Stage 1: Description ──────────────────────────────────────────────────
+  // ── Stage 1: Auto-detect photo vs cut-list ────────────────────────────────
+  onStatus('Step 1/3 — Detecting file type…');
+
+  // For images, first check if it's a photo or a plan
+  let isPhotoMode = false;
+  if (!isPDF) {
+    const detectText = await callClaude([{
+      role: 'user',
+      content: [fileBlock, { type: 'text', text: buildPhotoPrompt() }]
+    }], 3000);
+
+    if (detectText.startsWith('TYPE:CUTLIST')) {
+      // It's a plan image — use cut-list mode
+      isPhotoMode = false;
+    } else {
+      // It's a photo — use the photo estimation response directly
+      isPhotoMode = true;
+      onStatus('Step 2/3 — Extracting cabinet counts from photo…');
+      const extracted = await buildExtractionFromPhoto(detectText, fileBlock);
+      onStatus('Step 3/3 — Calculating take-off…');
+      const takeoff = computeTakeoff(extracted);
+      extracted.notes = (extracted.notes || '') + ' ⚠️ Dimensions estimated from photo — please review the imported cabinets before calculating price.';
+      return { description: detectText, extracted, takeoff, isPhotoMode: true };
+    }
+  }
+
   onStatus('Step 1/3 — Reading plan carefully…');
   const description = await callClaude([{
     role: 'user',

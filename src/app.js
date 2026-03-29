@@ -73,7 +73,7 @@ window.runAIReader = async function() {
     });
 
     statusEl.textContent = '✅ Plan read successfully!';
-    renderTakeoff(aiResult.takeoff, aiResult.description);
+    renderTakeoff(aiResult.takeoff, aiResult.description, aiResult.isPhotoMode);
 
   } catch (err) {
     console.error(err);
@@ -84,10 +84,21 @@ window.runAIReader = async function() {
   }
 };
 
-function renderTakeoff(t, description) {
+function renderTakeoff(t, description, isPhotoMode = false) {
   const takeoffEl = document.getElementById('aiTakeoff');
   const gridEl    = document.getElementById('takeoffGrid');
   const descEl    = document.getElementById('aiDescription');
+
+  // Show photo mode warning banner
+  const existingBanner = document.getElementById('photoModeBanner');
+  if (existingBanner) existingBanner.remove();
+  if (isPhotoMode) {
+    const banner = document.createElement('div');
+    banner.id = 'photoModeBanner';
+    banner.style.cssText = 'background:#3a2a10;border:1px solid #ffa000;border-radius:7px;padding:10px 14px;margin-bottom:12px;font-size:13px;color:#ffb74d;';
+    banner.innerHTML = '📷 <strong>Photo mode</strong> — Cabinet counts are estimated visually. Dimensions are standard estimates. Click <strong>Import Cabinets</strong> to review and adjust before pricing.';
+    takeoffEl.insertBefore(banner, takeoffEl.firstChild);
+  }
 
   const cards = [
     { label: 'HMR Sheets',     value: t.hmrSheets,   unit: 'White HMR 16mm' },
