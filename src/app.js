@@ -728,8 +728,8 @@ function buildSummaryReport(date) {
   `).join('');
 
   // Totals
-  const totalCarcass = result.items.reduce((s, i) => s + i.carcassSheets, 0);
-  const totalFace    = result.items.reduce((s, i) => s + i.faceSheets, 0);
+  const totalCarcass = result.pooled ? result.pooled.carcassSheets : result.items.reduce((s, i) => s + i.carcassSheets, 0);
+  const totalFace    = result.pooled ? result.pooled.faceSheets    : result.items.reduce((s, i) => s + i.faceSheets, 0);
   const totalDoors   = result.items.reduce((s, i) => s + i.doors, 0);
   const totalDrawers = result.items.reduce((s, i) => s + (i.totalDrawers || 0), 0);
   const totalHinges  = totalDoors * 2;
@@ -837,8 +837,8 @@ function buildMaterialReport(date) {
   const result = getLastResult();
   if (!result) return '<p>No estimate data.</p>';
 
-  const totalCarcass = result.items.reduce((s, i) => s + i.carcassSheets, 0);
-  const totalFace    = result.items.reduce((s, i) => s + i.faceSheets, 0);
+  const totalCarcass = result.pooled ? result.pooled.carcassSheets : result.items.reduce((s, i) => s + i.carcassSheets, 0);
+  const totalFace    = result.pooled ? result.pooled.faceSheets    : result.items.reduce((s, i) => s + i.faceSheets, 0);
   const totalDoors   = result.items.reduce((s, i) => s + i.doors, 0);
   const totalDrawers = result.items.reduce((s, i) => s + (i.totalDrawers || 0), 0);
   const totalHinges  = totalDoors * 2;
@@ -897,8 +897,10 @@ function buildMaterialReport(date) {
     </table>
 
     <div style="margin-top:20px;padding:12px;background:#f5f5f5;border-radius:6px;font-size:11px;color:#666">
-      <strong>Notes:</strong> Sheet counts include 10% waste factor. Hardware quantities are minimums — 
-      order 5–10% extra for breakage. Confirm hinge count for doors taller than 900mm (3 hinges required).
+      <strong>Notes:</strong> Sheet counts are <strong>pooled across all cabinets</strong> — parts from 
+      different cabinets nest together on the same sheet, so partial sheets are not wasted. 
+      Hardware quantities are minimums — order 5–10% extra for breakage. 
+      Confirm hinge count for doors taller than 900mm (3 hinges required).
     </div>
   </body></html>`;
 }
