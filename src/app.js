@@ -595,21 +595,21 @@ function renderResult(result) {
       <span>Grand Total — ${result.items.length} cabinet${result.items.length > 1 ? 's' : ''}</span>
       <span>${fmt(result.grandTotal)} AUD</span>
     </div>
-    ${result.pooled ? `
+    ${(result.pooled || result._aiTakeoff) ? `
     <div class="pooled-sheets-row">
       <div class="pooled-title">📦 Actual Sheets to Order (all cabinets pooled together)</div>
       <div class="pooled-grid">
         <div class="pooled-item">
           <span class="pooled-label">HMR 16mm (Carcass)</span>
-          <span class="pooled-value">${result.pooled.carcassSheets} sheets</span>
+          <span class="pooled-value">${result._aiTakeoff ? result._aiTakeoff.hmrSheets : result.pooled.carcassSheets} sheets</span>
         </div>
         <div class="pooled-item">
           <span class="pooled-label">MDF 18mm (Faces)</span>
-          <span class="pooled-value">${result.pooled.faceSheets} sheets</span>
+          <span class="pooled-value">${result._aiTakeoff ? result._aiTakeoff.mdfSheets : result.pooled.faceSheets} sheets</span>
         </div>
         <div class="pooled-item">
           <span class="pooled-label">Total Sheets</span>
-          <span class="pooled-value" style="color:#2A7FFF;font-weight:bold">${result.pooled.totalSheets} sheets</span>
+          <span class="pooled-value" style="color:#2A7FFF;font-weight:bold">${result._aiTakeoff ? (result._aiTakeoff.hmrSheets + result._aiTakeoff.mdfSheets) : result.pooled.totalSheets} sheets</span>
         </div>
       </div>
       <div style="font-size:11px;color:#666;margin-top:6px">
