@@ -75,6 +75,20 @@ window.runAIReader = async function() {
     statusEl.textContent = '✅ Plan read successfully!';
     renderTakeoff(aiResult.takeoff, aiResult.description, aiResult.isPhotoMode);
 
+    // Store AI result in print-compatible format so reports work immediately
+    const t = aiResult.takeoff;
+    window._lastEstimateResult = {
+      items: [],   // no per-cabinet items from AI read — reports use pooled data
+      grandTotal: 0,
+      pooled: {
+        carcassSheets: t.hmrSheets,
+        faceSheets:    t.mdfSheets,
+        totalSheets:   t.hmrSheets + t.mdfSheets
+      },
+      // Flat hardware totals for reports
+      _aiTakeoff: t
+    };
+
   } catch (err) {
     console.error(err);
     statusEl.className = 'ai-status error';
@@ -728,12 +742,13 @@ function buildSummaryReport(date) {
   `).join('');
 
   // Totals
+  const ai = result._aiTakeoff;
   const totalCarcass = result.pooled ? result.pooled.carcassSheets : result.items.reduce((s, i) => s + i.carcassSheets, 0);
   const totalFace    = result.pooled ? result.pooled.faceSheets    : result.items.reduce((s, i) => s + i.faceSheets, 0);
-  const totalDoors   = result.items.reduce((s, i) => s + i.doors, 0);
-  const totalDrawers = result.items.reduce((s, i) => s + (i.totalDrawers || 0), 0);
-  const totalHinges  = totalDoors * 2;
-  const totalSlides  = totalDrawers;
+  const totalDoors   = ai ? ai.totalDoors   : result.items.reduce((s, i) => s + i.doors, 0);
+  const totalDrawers = ai ? ai.totalDrawers : result.items.reduce((s, i) => s + (i.totalDrawers || 0), 0);
+  const totalHinges  = ai ? ai.totalHinges  : totalDoors * 2;
+  const totalSlides  = ai ? ai.totalSlides  : totalDrawers;
 
   return `<!DOCTYPE html><html><head>${printStyles()}<title>Summary Report</title></head><body>
     ${reportHeader('Summary Report', date)}
@@ -837,25 +852,30 @@ function buildMaterialReport(date) {
   const result = getLastResult();
   if (!result) return '<p>No estimate data.</p>';
 
+  const ai = result._aiTakeoff;
   const totalCarcass = result.pooled ? result.pooled.carcassSheets : result.items.reduce((s, i) => s + i.carcassSheets, 0);
   const totalFace    = result.pooled ? result.pooled.faceSheets    : result.items.reduce((s, i) => s + i.faceSheets, 0);
-  const totalDoors   = result.items.reduce((s, i) => s + i.doors, 0);
-  const totalDrawers = result.items.reduce((s, i) => s + (i.totalDrawers || 0), 0);
-  const totalHinges  = totalDoors * 2;
-  const totalSlides  = totalDrawers;
-  const totalHandles = totalDoors + totalDrawers;
+  const totalDoors   = ai ? ai.totalDoors   : result.items.reduce((s, i) => s + i.doors, 0);
+  const totalDrawers = ai ? ai.totalDrawers : result.items.reduce((s, i) => s + (i.totalDrawers || 0), 0);
+  const totalHinges  = ai ? ai.totalHinges  : totalDoors * 2;
+  const totalSlides  = ai ? ai.totalSlides  : totalDrawers;
+  const totalHandles = ai ? ai.totalHandles : totalDoors + totalDrawers;
 
-  const cabinetRows = result.items.map((item, i) => `
-    <tr>
-      <td>${item.label || 'Cabinet ' + (i+1)}</td>
-      <td>${item.cabinetType} ${item.dimensions.width}mm</td>
-      <td>${item.carcassSheets}</td>
-      <td>${item.faceSheets}</td>
-      <td>${item.doors > 0 ? item.doors * 2 : '—'}</td>
-      <td>${item.totalDrawers > 0 ? item.totalDrawers : '—'}</td>
-      <td>${item.shelves > 0 ? item.shelves : '—'}</td>
-    </tr>
-  `).join('');
+  const cabinetRows = result.items.length > 0
+    ? result.items.map((item, i) => `
+      <tr>
+        <td>${item.label || 'Cabinet ' + (i+1)}</td>
+        <td>${item.cabinetType} ${item.dimensions.width}mm</td>
+        <td>${item.carcassSheets}</td>
+        <td>${item.faceSheets}</td>
+        <td>${item.doors > 0 ? item.doors * 2 : '—'}</td>
+        <td>${item.totalDrawers > 0 ? item.totalDrawers : '—'}</td>
+        <td>${item.shelves > 0 ? item.shelves : '—'}</td>
+      </tr>
+    `).join('')
+    : `<tr><td colspan="7" style="color:#999;font-style:italic;text-align:center">
+        AI plan read — import cabinets to Manual Entry for per-cabinet breakdown
+      </td></tr>`;
 
   return `<!DOCTYPE html><html><head>${printStyles()}<title>Material List</title></head><body>
     ${reportHeader('Material & Hardware Order List', date)}
