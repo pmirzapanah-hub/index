@@ -61,29 +61,60 @@ Door(L)=left door (MDF 18mm), Door(R)=right door (MDF 18mm), Dwr=drawer front (M
 Parts with E1/E4 edging = carcass HMR. Parts with E3 edging = MDF/door panels.`;
 }
 
-// ── Description prompt — cut-list mode ───────────────────────────────────────
+// ── Description prompt — auto-detect and read ────────────────────────────────
 function buildDescriptionPrompt() {
-  return `This document contains drawings AND a Cabinet List table (usually on the second-to-last page titled "Cabinet List").
+  return `You are reading a cabinet document. First identify what type of document this is, then extract cabinet data accordingly.
 
-YOUR TASK: Read ONLY the Cabinet List table. It has columns: ID, Name, Width, Height, Depth, Description, Notes.
+═══ STEP 1: IDENTIFY DOCUMENT TYPE ═══
 
-RULES:
-1. Read every row in the Cabinet List table
-2. EXCLUDE rows where Name contains "Kickboard", "Filler", "Bulkhead", "Edge Filler", "End Panel", "Bar Back", "Dishwasher (PR)" — these are not cabinets
-3. For each cabinet row determine:
-   - type: "base" if Height ~870mm, "wall" if Height ~456-760mm, "tall" if Height >1200mm
-   - doors: count from Description — e.g. "2 Doors" = 2, "1 Door" = 1, "Open" = 0, "Rangehood" = 0
-   - drawers: count from Description — e.g. "3 Drw" = 3, "1 Drw" = 1, "0" if not mentioned
-   - shelves: 0 unless "Shelf" mentioned (Mozaik base/wall cabinets rarely list shelves in cabinet list)
+Scan the document and determine which type it is:
+TYPE A — Mozaik Cabinet List: Has a structured table with columns "ID, Name, Width, Height, Depth, Description" and cabinet IDs like R1C1, R1C2 etc.
+TYPE B — Floor plan / elevation drawing: Has cabinet outlines with dimension labels and cabinet numbers like #1, #2 etc.
+TYPE C — Kitchen photo or render: A real or rendered photograph of a kitchen.
 
-LIST every cabinet exactly like this:
-R1C1: base | W=300 H=870 D=580 | doors=0 drawers=1 shelves=0
-R1C2: base | W=987 H=870 D=580 | doors=1 drawers=0 shelves=0
-(continue for every non-excluded row)
+Write "DOCUMENT TYPE: A" or "DOCUMENT TYPE: B" or "DOCUMENT TYPE: C" at the top.
 
-FINAL TALLY:
+═══ STEP 2A: IF MOZAIK CABINET LIST (Type A) ═══
+
+Read the Cabinet List table. EXCLUDE rows containing: Kickboard, Filler, Bulkhead, End Panel, Bar Back, Dishwasher (PR), Edge Filler.
+
+For each remaining row:
+- type: "base" if Height ~720-900mm, "wall" if Height ~400-760mm and depth ≤400, "tall" if Height >1200mm
+- doors: from Description — "2 Doors"=2, "1 Door"=1, "Open"=0, "Rangehood"=0
+- drawers: from Description — "3 Drw"=3, "1 Drw"=1, else 0
+
+FORMAT:
+R1C1: base | W=300 H=870 D=580 | doors=0 drawers=1
+R1C2: base | W=987 H=870 D=580 | doors=1 drawers=0
+(every non-excluded row)
+
+═══ STEP 2B: IF FLOOR PLAN / ELEVATION (Type B) ═══
+
+Read cabinet numbers and dimensions from the drawings.
+For each cabinet number (#1, #2 etc or labeled cabinets):
+- Identify width from dimension labels
+- Identify type from context (base=below bench, wall=above bench, tall=full height)
+- Count doors and drawers from the elevation view
+
+FORMAT:
+Cabinet #1: base | est. width=300mm | doors=0 drawers=1
+Cabinet #2: base | est. width=987mm | doors=1 drawers=0
+
+═══ STEP 2C: IF PHOTO (Type C) ═══
+
+Estimate from visual inspection:
+- Count visible door panels and drawer fronts
+- Estimate widths: single door≈600mm, double door≈900mm, drawer bank≈600mm
+- Standard heights: base=720mm, wall=700mm, tall=2100mm
+
+FORMAT:
+Cabinet 1: base | est. width=600mm | doors=1 drawers=0 confidence=high
+Cabinet 2: wall | est. width=600mm | doors=2 drawers=0 confidence=medium
+
+═══ STEP 3: FINAL TALLY (all types) ═══
+
 TOTAL BASE: X
-TOTAL WALL: X  
+TOTAL WALL: X
 TOTAL TALL: X
 TOTAL DOORS: X
 TOTAL DRAWERS: X`;
@@ -174,7 +205,7 @@ Respond with ONLY valid JSON:
 
 // ── Extraction prompt ─────────────────────────────────────────────────────────
 function buildExtractionPrompt(description) {
-  return `Convert this cabinet list into structured JSON.
+  return `Convert this cabinet analysis into structured JSON.
 
 SOURCE DATA:
 ---
@@ -182,12 +213,13 @@ ${description}
 ---
 
 RULES:
-- Each R1Cx entry = one cabinet entry with qty:1
-- Only group if IDENTICAL: same type + same width + same doors + same drawers (e.g. R1C14 and R1C15 are both base 705mm 3 drawers → qty:2)
-- door_count and drawer_count are PER CABINET as listed
-- Use EXACT widths — do not round or change
+- Each cabinet entry gets qty:1 UNLESS two cabinets are truly identical (same type + width + doors + drawers) — then group with qty:2
+- door_count and drawer_count are PER CABINET (not total)
+- Use exact widths as listed — do not round unless truly unclear
+- If widths are unclear, snap to nearest: 300/400/450/500/600/700/750/900/1000/1200mm
 - total_doors_check and total_drawers_check must match FINAL TALLY
-- Exclude all kickboards, fillers, bulkheads, end panels from cabinets
+- Exclude kickboards, fillers, bulkheads, end panels
+- For photos (Type C), mark estimated:true on each cabinet entry
 
 Respond with ONLY valid JSON — no markdown, no extra text:
 {
@@ -255,33 +287,7 @@ export async function readPlanFile(file, onStatus = () => {}) {
     ? { type: 'document', source: { type: 'base64', media_type: 'application/pdf', data: base64Data } }
     : { type: 'image',    source: { type: 'base64', media_type: mimeType,           data: base64Data } };
 
-  // ── Stage 1: Auto-detect photo vs cut-list ────────────────────────────────
-  onStatus('Step 1/3 — Detecting file type…');
-
-  // For images, first check if it's a photo or a plan
-  let isPhotoMode = false;
-  if (!isPDF) {
-    const detectText = await callClaude([{
-      role: 'user',
-      content: [fileBlock, { type: 'text', text: buildPhotoPrompt() }]
-    }], 3000);
-
-    if (detectText.startsWith('TYPE:CUTLIST')) {
-      // It's a plan image — use cut-list mode
-      isPhotoMode = false;
-    } else {
-      // It's a photo — use the photo estimation response directly
-      isPhotoMode = true;
-      onStatus('Step 2/3 — Extracting cabinet counts from photo…');
-      const extracted = await buildExtractionFromPhoto(detectText, fileBlock);
-      onStatus('Step 3/3 — Calculating take-off…');
-      const takeoff = computeTakeoff(extracted);
-      extracted.notes = (extracted.notes || '') + ' ⚠️ Dimensions estimated from photo — please review the imported cabinets before calculating price.';
-      return { description: detectText, extracted, takeoff, isPhotoMode: true };
-    }
-  }
-
-  onStatus('Step 1/3 — Reading plan carefully…');
+  onStatus('Step 1/3 — Reading document…');
   const description = await callClaude([{
     role: 'user',
     content: [fileBlock, { type: 'text', text: buildDescriptionPrompt() }]
